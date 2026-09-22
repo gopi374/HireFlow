@@ -1,17 +1,25 @@
-require('dotenv').config();
-const express =require('express');
-const cors = require('cors');
-const connectdb = require('./config/db.js')
+import dotenv from "dotenv";
+dotenv.config();
 
-const app = express();
-
-app.get('/',(req,res)=>{
-    res.send("Server is listening...");    
-})
+import http from "http";
+import app from "./app.js";
+import { connectDB } from "./config/db.js";
 
 const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
 
-app.listen(PORT,()=>{
-    console.log(`🚀 Server running on PORT : http://localhost:${PORT} `)
-    connectdb();
-})
+const startServer = async () => {
+  try {
+    await connectDB();
+    server.listen(PORT, () => {
+      console.log(`🚀 HireFlow Server running at http://localhost:${PORT}`);
+      console.log(`📄 Health check: http://localhost:${PORT}/health`);
+      console.log(`📡 API Base: http://localhost:${PORT}/api/v1`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();
