@@ -1,23 +1,41 @@
-import Interview from "../models/Interview.js";
+﻿import Interview from "../models/Interview.js";
 import Application from "../models/Application.js";
-import { sendSuccess, sendError, getPagination } from "../utils/response.js";
-import { logAudit, createNotification } from "../utils/audit.js";
+import { getPagination } from "../utils/response.js";
 
-export const scheduleInterview = async (req, res, next) => {
+// SCHEDULE New Interview
+export async function scheduleInterview(req, res) {
+  const {
+    applicationId,
+    scheduledAt,
+    durationMinutes,
+    type,
+    mode,
+    meetingUrl,
+    location,
+    interviewers,
+  } = req.body || {};
+
+  if (!applicationId || !scheduledAt) {
+    return res.status(400).json({
+      success: false,
+      message: "Application ID and scheduled time are required",
+    });
+  }
+
   try {
-    const { applicationId, scheduledAt, durationMinutes, type, mode, meetingUrl, location, interviewers } = req.body;
-
-    if (!applicationId || !scheduledAt) {
-      return sendError(res, "Application ID and scheduled time are required.", 400, "MISSING_FIELDS");
-    }
-
     const application = await Application.findById(applicationId).populate("job");
     if (!application) {
-      return sendError(res, "Application not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
     }
 
     if (application.job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to schedule interviews for this application", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to schedule interviews for this application",
+      });
     }
 
     const interview = await Interview.create({
@@ -34,7 +52,7 @@ export const scheduleInterview = async (req, res, next) => {
       status: "SCHEDULED",
     });
 
-    // Advance application status to INTERVIEW if needed
+    // Advance application status to INTERVIEW if not already
     if (["APPLIED", "SCREENING", "SHORTLISTED"].includes(application.status)) {
       application.status = "INTERVIEW";
       application.statusHistory.push({
@@ -46,7 +64,7 @@ export const scheduleInterview = async (req, res, next) => {
       await application.save();
     }
 
-    // Notify candidate
+    // Notify Candidate
     await createNotification({
       recipient: application.candidate,
       type: "INTERVIEW_SCHEDULED",
@@ -56,15 +74,23 @@ export const scheduleInterview = async (req, res, next) => {
       entityId: interview._id,
     });
 
-    await logAudit({ actor: req.user._id, action: "INTERVIEW_SCHEDULED", entityType: "Interview", entityId: interview._id, req });
 
-    return sendSuccess(res, { interview }, "Interview scheduled successfully", 201);
-  } catch (error) {
-    next(error);
+    return res.status(201).json({
+      success: true,
+      message: "Interview scheduled successfully !!",
+      interview,
+    });
+  } catch (err) {
+    console.error("Schedule Interview Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getInterviews = async (req, res, next) => {
+// GET Interviews List (with role-based filtering)
+export async function getInterviews(req, res) {
   try {
     const { page, limit, skip } = getPagination(req.query);
     const filter = {};
@@ -88,22 +114,42 @@ export const getInterviews = async (req, res, next) => {
       Interview.countDocuments(filter),
     ]);
 
-    return sendSuccess(res, interviews, "Interviews fetched", 200, { page, limit, total, totalPages: Math.ceil(total / limit) });
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Interviews fetched successfully",
+      data: interviews,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Get Interviews Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getInterviewById = async (req, res, next) => {
+// GET Single Interview by ID
+export async function getInterviewById(req, res) {
+  const { interviewId } = req.params;
+
   try {
-    const interview = await Interview.findById(req.params.interviewId)
+    const interview = await Interview.findById(interviewId)
       .populate("candidate", "name email phone")
       .populate({ path: "job", populate: { path: "company", select: "name logo" } })
       .populate("interviewers", "name email")
       .populate("evaluation.evaluatedBy", "name email");
 
     if (!interview) {
-      return sendError(res, "Interview not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Interview not found",
+      });
     }
 
     const isCandidate = interview.candidate._id.toString() === req.user._id.toString();
@@ -111,7 +157,10 @@ export const getInterviewById = async (req, res, next) => {
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isCandidate && !isInterviewer && !isAdmin) {
-      return sendError(res, "Not authorized to view this interview", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to view this interview",
+      });
     }
 
     const doc = interview.toObject();
@@ -119,48 +168,79 @@ export const getInterviewById = async (req, res, next) => {
       delete doc.evaluation;
     }
 
-    return sendSuccess(res, { interview: doc }, "Interview details fetched");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      interview: doc,
+    });
+  } catch (err) {
+    console.error("Get Interview By ID Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const updateInterview = async (req, res, next) => {
+// UPDATE Interview Details
+export async function updateInterview(req, res) {
+  const { interviewId } = req.params;
+
   try {
-    const { interviewId } = req.params;
     const interview = await Interview.findById(interviewId);
-
     if (!interview) {
-      return sendError(res, "Interview not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Interview not found",
+      });
     }
 
     const isInterviewer = interview.interviewers.some((id) => id.toString() === req.user._id.toString());
     if (!isInterviewer && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to update interview", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update interview",
+      });
     }
 
-    const updated = await Interview.findByIdAndUpdate(interviewId, { $set: req.body }, { new: true, runValidators: true });
+    const updated = await Interview.findByIdAndUpdate(
+      interviewId,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
 
-    return sendSuccess(res, { interview: updated }, "Interview updated successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Interview updated successfully",
+      interview: updated,
+    });
+  } catch (err) {
+    console.error("Update Interview Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const cancelInterview = async (req, res, next) => {
+// CANCEL Interview
+export async function cancelInterview(req, res) {
+  const { interviewId } = req.params;
+  const { reason } = req.body || {};
+
   try {
-    const { interviewId } = req.params;
-    const { reason } = req.body;
-
     const interview = await Interview.findById(interviewId);
     if (!interview) {
-      return sendError(res, "Interview not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Interview not found",
+      });
     }
 
     interview.status = "CANCELLED";
     interview.cancellationReason = reason || "Cancelled by recruiter";
     await interview.save();
 
+    // Notify candidate
     await createNotification({
       recipient: interview.candidate,
       type: "INTERVIEW_CANCELLED",
@@ -170,22 +250,33 @@ export const cancelInterview = async (req, res, next) => {
       entityId: interview._id,
     });
 
-    await logAudit({ actor: req.user._id, action: "INTERVIEW_CANCELLED", entityType: "Interview", entityId: interview._id, req });
 
-    return sendSuccess(res, { interview }, "Interview cancelled successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Interview cancelled successfully",
+      interview,
+    });
+  } catch (err) {
+    console.error("Cancel Interview Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const evaluateInterview = async (req, res, next) => {
+// EVALUATE Interview Feedback
+export async function evaluateInterview(req, res) {
+  const { interviewId } = req.params;
+  const { rating, feedback, strengths, weaknesses, decision, shareableWithCandidate, candidateFeedback } = req.body || {};
+
   try {
-    const { interviewId } = req.params;
-    const { rating, feedback, strengths, weaknesses, decision, shareableWithCandidate, candidateFeedback } = req.body;
-
     const interview = await Interview.findById(interviewId);
     if (!interview) {
-      return sendError(res, "Interview not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Interview not found",
+      });
     }
 
     interview.evaluation = {
@@ -194,7 +285,7 @@ export const evaluateInterview = async (req, res, next) => {
       strengths,
       weaknesses,
       decision,
-      shareableWithCandidate: !!shareableWithCandidate,
+      shareableWithCandidate: Boolean(shareableWithCandidate),
       candidateFeedback,
       evaluatedBy: req.user._id,
       evaluatedAt: new Date(),
@@ -202,10 +293,17 @@ export const evaluateInterview = async (req, res, next) => {
     interview.status = "COMPLETED";
     await interview.save();
 
-    await logAudit({ actor: req.user._id, action: "INTERVIEW_EVALUATED", entityType: "Interview", entityId: interview._id, req });
 
-    return sendSuccess(res, { interview }, "Interview evaluated successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Interview evaluation submitted successfully",
+      interview,
+    });
+  } catch (err) {
+    console.error("Evaluate Interview Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}

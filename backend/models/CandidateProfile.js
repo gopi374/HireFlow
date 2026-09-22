@@ -1,12 +1,32 @@
 import mongoose from "mongoose";
 
+// Candidate Profile Schema
 const candidateProfileSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    headline: { type: String, trim: true },
-    summary: { type: String, trim: true },
-    location: { type: String, trim: true },
-    skills: [{ type: String, trim: true }],
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
+    headline: {
+      type: String,
+      trim: true,
+    },
+    summary: {
+      type: String,
+      trim: true,
+    },
+    location: {
+      type: String,
+      trim: true,
+    },
+    skills: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     experience: [
       {
         title: String,
@@ -55,13 +75,25 @@ const candidateProfileSchema = new mongoose.Schema(
         fileUrl: String,
         fileSize: Number,
         mimeType: String,
-        isPrimary: { type: Boolean, default: false },
-        uploadedAt: { type: Date, default: Date.now },
+        isPrimary: {
+          type: Boolean,
+          default: false,
+        },
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
-    savedJobs: [{ type: mongoose.Schema.Types.ObjectId, ref: "Job" }],
+    savedJobs: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Job",
+      },
+    ],
   },
   { timestamps: true }
 );
 
-export default mongoose.models.CandidateProfile || mongoose.model("CandidateProfile", candidateProfileSchema);
+const CandidateProfile = mongoose.models.CandidateProfile || mongoose.model("CandidateProfile", candidateProfileSchema);
+export default CandidateProfile;

@@ -8,6 +8,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Multer disk storage setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -19,6 +20,7 @@ const storage = multer.diskStorage({
   },
 });
 
+// Allow PDFs, Word Docs, and common image files
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
     "application/pdf",
@@ -27,6 +29,7 @@ const fileFilter = (req, file, cb) => {
     "image/jpeg",
     "image/png",
   ];
+
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -36,6 +39,8 @@ const fileFilter = (req, file, cb) => {
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB maximum file size
   fileFilter,
 });
+
+export default upload;

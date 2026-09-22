@@ -13,9 +13,13 @@ import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
+// All user routes require authentication
 router.use(protect);
 
+// User profile
 router.patch("/me", updateMe);
+
+// Candidate specific actions
 router.patch("/me/candidate-profile", authorize("CANDIDATE"), updateCandidateProfile);
 router.post("/me/resume", authorize("CANDIDATE"), upload.single("resume"), uploadResume);
 router.post("/jobs/:jobId/save", authorize("CANDIDATE"), toggleSaveJob);

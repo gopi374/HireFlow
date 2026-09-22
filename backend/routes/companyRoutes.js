@@ -11,9 +11,11 @@ import { authorize } from "../middleware/rbac.js";
 
 const router = express.Router();
 
+// Public company discovery
 router.get("/", getCompanies);
 router.get("/:companyId", getCompanyById);
 
+// Recruiter & Admin company management
 router.post("/", protect, authorize("RECRUITER", "ADMIN"), createCompany);
 router.patch("/:companyId", protect, authorize("RECRUITER", "ADMIN"), updateCompany);
 router.post("/:companyId/verification", protect, authorize("RECRUITER", "ADMIN"), requestVerification);

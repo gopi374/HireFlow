@@ -12,11 +12,14 @@ import { authorize } from "../middleware/rbac.js";
 
 const router = express.Router();
 
+// Require login for interview routes
 router.use(protect);
 
+// View interviews
 router.get("/", getInterviews);
 router.get("/:interviewId", getInterviewById);
 
+// Recruiter & Admin interview actions
 router.post("/", authorize("RECRUITER", "ADMIN"), scheduleInterview);
 router.patch("/:interviewId", authorize("RECRUITER", "ADMIN"), updateInterview);
 router.post("/:interviewId/cancel", authorize("RECRUITER", "ADMIN"), cancelInterview);

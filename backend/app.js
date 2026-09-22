@@ -5,36 +5,25 @@ import rateLimit from "express-rate-limit";
 import path from "path";
 import crypto from "crypto";
 import apiRoutes from "./routes/index.js";
-import { notFoundHandler, globalErrorHandler } from "./middleware/errorHandler.js";
-
+import connectDB from "./config/db.js"
 const app = express();
 
-// Security Headers
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // CORS
-const allowedOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(",") : ["http://localhost:3000", "http://localhost:5173"];
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Dev fallback
-      }
-    },
-    credentials: true,
-  })
-);
+const allowedOrigins = process.env.CORS_ORIGINS || "http://localhost:5173";
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+
 
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, error: { code: "RATE_LIMIT_EXCEEDED", message: "Too many requests, please try again later." } },
 });
+
 app.use("/api", limiter);
 
 // Request ID & Body Parsing
@@ -50,12 +39,23 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.resolve("uploads")));
 
 // Health & Readiness checks
-app.get("/health", (req, res) => res.status(200).json({ status: "OK", timestamp: new Date().toISOString() }));
-app.get("/ready", (req, res) => res.status(200).json({ status: "READY", timestamp: new Date().toISOString() }));
+app.get("/health", (req, res) => 
+  res.status(200).json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString() 
+  })
+);
+
+app.get("/ready", (req, res) => 
+  res.status(200).json({ 
+    status: "READY", 
+    timestamp: new Date().toISOString() 
+  })
+);
 
 // API routes
 app.use("/api/v1", apiRoutes);
-app.use("/api/auth", apiRoutes); // Backwards compatibility for /api/auth
+app.use("/api/auth", apiRoutes); 
 
 app.get("/", (req, res) => {
   res.json({
@@ -66,8 +66,20 @@ app.get("/", (req, res) => {
   });
 });
 
-// Centralized error handling
-app.use(notFoundHandler);
-app.use(globalErrorHandler);
+const PORT = process.env.PORT || 5000;
 
-export default app;
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`🚀 HireFlow Server running at http://localhost:${PORT}`);
+      console.log(`📄 Health check: http://localhost:${PORT}/health`);
+      console.log(`📡 API Base: http://localhost:${PORT}/api/v1`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

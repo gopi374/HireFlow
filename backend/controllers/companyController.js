@@ -1,22 +1,31 @@
-import Company from "../models/Company.js";
-import { sendSuccess, sendError, getPagination } from "../utils/response.js";
-import { logAudit } from "../utils/audit.js";
+﻿import Company from "../models/Company.js";
+import { getPagination } from "../utils/response.js";
 
-export const createCompany = async (req, res, next) => {
+// CREATE Company Profile
+export async function createCompany(req, res) {
+  const { name, description, website, logo, location, industry, size } = req.body || {};
+
+  if (!name) {
+    return res.status(400).json({
+      success: false,
+      message: "Company name is required",
+    });
+  }
+
   try {
-    const { name, description, website, logo, location, industry, size } = req.body;
+    const existing = await Company.findOne({
+      name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
+    });
 
-    if (!name) {
-      return sendError(res, "Company name is required.", 400, "MISSING_NAME");
-    }
-
-    const existing = await Company.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
     if (existing) {
-      return sendError(res, "A company with this name already exists.", 409, "COMPANY_EXISTS");
+      return res.status(409).json({
+        success: false,
+        message: "A company with this name already exists",
+      });
     }
 
     const company = await Company.create({
-      name,
+      name: name.trim(),
       description,
       website,
       logo,
@@ -27,15 +36,23 @@ export const createCompany = async (req, res, next) => {
       recruiterIds: [req.user._id],
     });
 
-    await logAudit({ actor: req.user._id, action: "COMPANY_CREATED", entityType: "Company", entityId: company._id, req });
 
-    return sendSuccess(res, { company }, "Company created successfully", 201);
-  } catch (error) {
-    next(error);
+    return res.status(201).json({
+      success: true,
+      message: "Company created successfully",
+      company,
+    });
+  } catch (err) {
+    console.error("Create Company Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getCompanies = async (req, res, next) => {
+// GET All Companies with pagination and search
+export async function getCompanies(req, res) {
   try {
     const { page, limit, skip } = getPagination(req.query);
     const filter = {};
@@ -48,67 +65,119 @@ export const getCompanies = async (req, res, next) => {
       Company.countDocuments(filter),
     ]);
 
-    return sendSuccess(res, companies, "Companies fetched", 200, { page, limit, total, totalPages: Math.ceil(total / limit) });
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Companies fetched successfully",
+      data: companies,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Get Companies Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getCompanyById = async (req, res, next) => {
+// GET Company by ID
+export async function getCompanyById(req, res) {
+  const { companyId } = req.params;
+
   try {
-    const company = await Company.findById(req.params.companyId).populate("owner recruiterIds", "name email");
+    const company = await Company.findById(companyId).populate("owner recruiterIds", "name email");
+
     if (!company) {
-      return sendError(res, "Company not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
     }
-    return sendSuccess(res, { company }, "Company fetched");
-  } catch (error) {
-    next(error);
-  }
-};
 
-export const updateCompany = async (req, res, next) => {
+    return res.status(200).json({
+      success: true,
+      company,
+    });
+  } catch (err) {
+    console.error("Get Company By ID Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
+  }
+}
+
+// UPDATE Company
+export async function updateCompany(req, res) {
+  const { companyId } = req.params;
+
   try {
-    const { companyId } = req.params;
     const company = await Company.findById(companyId);
-
     if (!company) {
-      return sendError(res, "Company not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
     }
 
-    // Ownership check: must be owner or listed recruiter or admin
+    // Must be company owner, recruiter in the company, or an admin
     const isOwner = company.owner.toString() === req.user._id.toString();
-    const isRecruiter = company.recruiterIds.some((id) => id.toString() === req.user._id.toString());
+    const isRecruiter = company.recruiterIds?.some((id) => id.toString() === req.user._id.toString());
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isOwner && !isRecruiter && !isAdmin) {
-      return sendError(res, "You are not authorized to update this company", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this company",
+      });
     }
 
-    const { name, description, website, logo, location, industry, size } = req.body;
+    const { name, description, website, logo, location, industry, size } = req.body || {};
+
     const updatedCompany = await Company.findByIdAndUpdate(
       companyId,
       { name, description, website, logo, location, industry, size },
       { new: true, runValidators: true }
     );
 
-    return sendSuccess(res, { company: updatedCompany }, "Company updated successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Company updated successfully",
+      company: updatedCompany,
+    });
+  } catch (err) {
+    console.error("Update Company Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const requestVerification = async (req, res, next) => {
+// REQUEST Verification for Company
+export async function requestVerification(req, res) {
+  const { companyId } = req.params;
+  const { documents, notes } = req.body || {};
+
   try {
-    const { companyId } = req.params;
-    const { documents, notes } = req.body;
-
     const company = await Company.findById(companyId);
     if (!company) {
-      return sendError(res, "Company not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
     }
 
     if (company.owner.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Only the company owner can submit for verification", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Only the company owner can submit verification requests",
+      });
     }
 
     company.verificationStatus = "PENDING";
@@ -116,10 +185,17 @@ export const requestVerification = async (req, res, next) => {
     if (notes) company.verificationNotes = notes;
     await company.save();
 
-    await logAudit({ actor: req.user._id, action: "COMPANY_VERIFICATION_REQUESTED", entityType: "Company", entityId: company._id, req });
 
-    return sendSuccess(res, { company }, "Verification request submitted");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Verification request submitted successfully",
+      company,
+    });
+  } catch (err) {
+    console.error("Company Verification Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}

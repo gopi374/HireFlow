@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const connectDB = async () => {
+const connectDB = async () => {
   try {
     const uri = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://127.0.0.1:27017/hireflow";
     const conn = await mongoose.connect(uri);
@@ -10,3 +10,5 @@ export const connectDB = async () => {
     process.exit(1);
   }
 };
+
+export default connectDB;

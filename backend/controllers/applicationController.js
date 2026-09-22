@@ -1,8 +1,7 @@
-import Application from "../models/Application.js";
+﻿import Application from "../models/Application.js";
 import Job from "../models/Job.js";
 import CandidateProfile from "../models/CandidateProfile.js";
-import { sendSuccess, sendError, getPagination } from "../utils/response.js";
-import { logAudit, createNotification } from "../utils/audit.js";
+import { getPagination } from "../utils/response.js";
 
 const VALID_STATUS_TRANSITIONS = {
   APPLIED: ["SCREENING", "REJECTED", "WITHDRAWN"],
@@ -14,28 +13,44 @@ const VALID_STATUS_TRANSITIONS = {
   WITHDRAWN: [],
 };
 
-export const applyToJob = async (req, res, next) => {
-  try {
-    const { jobId } = req.params;
-    const { resumeUrl, coverLetter, answers } = req.body;
+// APPLY for a Job
+export async function applyToJob(req, res) {
+  const { jobId } = req.params;
+  const { resumeUrl, coverLetter, answers } = req.body || {};
 
+  try {
     const job = await Job.findById(jobId).populate("company");
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
     if (job.status !== "PUBLISHED") {
-      return sendError(res, "This job is no longer accepting applications", 400, "JOB_NOT_ACCEPTING");
+      return res.status(400).json({
+        success: false,
+        message: "This job is not currently accepting applications",
+      });
     }
 
     if (job.deadline && new Date(job.deadline) < new Date()) {
-      return sendError(res, "Application deadline for this job has expired", 400, "DEADLINE_PASSED");
+      return res.status(400).json({
+        success: false,
+        message: "Application deadline for this job has passed",
+      });
     }
 
-    // Check duplicate
-    const existing = await Application.findOne({ candidate: req.user._id, job: jobId });
+    // Check duplicate application
+    const existing = await Application.findOne({
+      candidate: req.user._id,
+      job: jobId,
+    });
     if (existing) {
-      return sendError(res, "You have already applied to this job.", 409, "DUPLICATE_APPLICATION");
+      return res.status(409).json({
+        success: false,
+        message: "You have already applied to this job",
+      });
     }
 
     let finalResumeUrl = resumeUrl;
@@ -43,7 +58,10 @@ export const applyToJob = async (req, res, next) => {
       const profile = await CandidateProfile.findOne({ user: req.user._id });
       const primaryResume = profile?.resumes?.find((r) => r.isPrimary) || profile?.resumes?.[0];
       if (!primaryResume) {
-        return sendError(res, "Please provide or upload a resume to apply.", 400, "RESUME_REQUIRED");
+        return res.status(400).json({
+          success: false,
+          message: "Please upload or provide a resume link to apply",
+        });
       }
       finalResumeUrl = primaryResume.fileUrl;
     }
@@ -53,7 +71,7 @@ export const applyToJob = async (req, res, next) => {
       job: jobId,
       resumeUrl: finalResumeUrl,
       coverLetter,
-      answers,
+      answers: answers || [],
       status: "APPLIED",
       statusHistory: [
         {
@@ -67,7 +85,7 @@ export const applyToJob = async (req, res, next) => {
 
     await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: 1 } });
 
-    // Notify recruiter
+    // Notify recruiter about new applicant
     await createNotification({
       recipient: job.recruiter,
       type: "NEW_APPLICATION",
@@ -77,27 +95,42 @@ export const applyToJob = async (req, res, next) => {
       entityId: application._id,
     });
 
-    await logAudit({ actor: req.user._id, action: "APPLICATION_SUBMITTED", entityType: "Application", entityId: application._id, req });
 
-    return sendSuccess(res, { application }, "Application submitted successfully", 201);
-  } catch (error) {
-    next(error);
+    return res.status(201).json({
+      success: true,
+      message: "Application submitted successfully !!",
+      application,
+    });
+  } catch (err) {
+    console.error("Apply Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getJobApplications = async (req, res, next) => {
+// GET All Applications for a Specific Job (Recruiter)
+export async function getJobApplications(req, res) {
+  const { jobId } = req.params;
+
   try {
-    const { jobId } = req.params;
     const { page, limit, skip } = getPagination(req.query);
     const { status } = req.query;
 
     const job = await Job.findById(jobId);
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
     if (job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to view applications for this job", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to view applications for this job",
+      });
     }
 
     const filter = { job: jobId };
@@ -112,15 +145,31 @@ export const getJobApplications = async (req, res, next) => {
       Application.countDocuments(filter),
     ]);
 
-    return sendSuccess(res, applications, "Applications fetched", 200, { page, limit, total, totalPages: Math.ceil(total / limit) });
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Applications fetched successfully",
+      data: applications,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Get Job Applications Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getApplicationById = async (req, res, next) => {
+// GET Application by ID
+export async function getApplicationById(req, res) {
+  const { applicationId } = req.params;
+
   try {
-    const { applicationId } = req.params;
     const application = await Application.findById(applicationId)
       .populate("candidate", "name email phone")
       .populate({ path: "job", populate: { path: "company", select: "name logo" } })
@@ -128,51 +177,68 @@ export const getApplicationById = async (req, res, next) => {
       .populate("recruiterNotes.author", "name");
 
     if (!application) {
-      return sendError(res, "Application not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
     }
 
     const isCandidate = application.candidate._id.toString() === req.user._id.toString();
-    const isRecruiter = application.job.recruiter?.toString() === req.user._id.toString();
+    const isRecruiter = application.job?.recruiter?.toString() === req.user._id.toString();
     const isAdmin = req.user.role === "ADMIN";
 
     if (!isCandidate && !isRecruiter && !isAdmin) {
-      return sendError(res, "Unauthorized access to application", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access to application",
+      });
     }
 
-    const appObj = application.toObject();
-    // Hide recruiter internal notes from candidate
+    const appDoc = application.toObject();
     if (isCandidate && !isAdmin) {
-      delete appObj.recruiterNotes;
+      delete appDoc.recruiterNotes;
     }
 
-    return sendSuccess(res, { application: appObj }, "Application details fetched");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      application: appDoc,
+    });
+  } catch (err) {
+    console.error("Get Application Details Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const updateApplicationStatus = async (req, res, next) => {
+// UPDATE Application Status
+export async function updateApplicationStatus(req, res) {
+  const { applicationId } = req.params;
+  const { status, reason } = req.body || {};
+
   try {
-    const { applicationId } = req.params;
-    const { status, reason } = req.body;
-
     const application = await Application.findById(applicationId).populate("job");
     if (!application) {
-      return sendError(res, "Application not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
     }
 
     if (application.job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to update application status", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update application status",
+      });
     }
 
     const allowed = VALID_STATUS_TRANSITIONS[application.status];
     if (!allowed || !allowed.includes(status)) {
-      return sendError(
-        res,
-        `Invalid status transition from ${application.status} to ${status}. Allowed: ${allowed?.join(", ") || "none"}`,
-        400,
-        "INVALID_STATUS_TRANSITION"
-      );
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status transition from ${application.status} to ${status}. Allowed: ${allowed?.join(", ") || "none"}`,
+      });
     }
 
     application.status = status;
@@ -194,63 +260,91 @@ export const updateApplicationStatus = async (req, res, next) => {
       entityId: application._id,
     });
 
-    await logAudit({
-      actor: req.user._id,
-      action: "APPLICATION_STATUS_UPDATED",
-      entityType: "Application",
-      entityId: application._id,
-      metadata: { newStatus: status, reason },
-      req,
+
+    return res.status(200).json({
+      success: true,
+      message: `Application status updated to ${status}`,
+      application,
     });
-
-    return sendSuccess(res, { application }, `Application status updated to ${status}`);
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error("Update Application Status Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const addRecruiterNote = async (req, res, next) => {
+// ADD Recruiter Internal Note
+export async function addRecruiterNote(req, res) {
+  const { applicationId } = req.params;
+  const { note } = req.body || {};
+
+  if (!note) {
+    return res.status(400).json({
+      success: false,
+      message: "Note text is required",
+    });
+  }
+
   try {
-    const { applicationId } = req.params;
-    const { note } = req.body;
-
-    if (!note) {
-      return sendError(res, "Note text is required", 400, "MISSING_NOTE");
-    }
-
     const application = await Application.findById(applicationId).populate("job");
     if (!application) {
-      return sendError(res, "Application not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
     }
 
     if (application.job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to add notes to this application", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to add notes to this application",
+      });
     }
 
     application.recruiterNotes.push({ note, author: req.user._id });
     await application.save();
 
-    return sendSuccess(res, { notes: application.recruiterNotes }, "Recruiter note added");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Recruiter note added successfully",
+      notes: application.recruiterNotes,
+    });
+  } catch (err) {
+    console.error("Add Recruiter Note Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const withdrawApplication = async (req, res, next) => {
+// WITHDRAW Application (Candidate)
+export async function withdrawApplication(req, res) {
+  const { applicationId } = req.params;
+
   try {
-    const { applicationId } = req.params;
     const application = await Application.findById(applicationId);
-
     if (!application) {
-      return sendError(res, "Application not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
     }
 
     if (application.candidate.toString() !== req.user._id.toString()) {
-      return sendError(res, "You can only withdraw your own applications", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "You can only withdraw your own applications",
+      });
     }
 
     if (["SELECTED", "REJECTED", "WITHDRAWN"].includes(application.status)) {
-      return sendError(res, `Cannot withdraw application in ${application.status} state`, 400, "CANNOT_WITHDRAW");
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw application in ${application.status} state`,
+      });
     }
 
     application.status = "WITHDRAWN";
@@ -262,8 +356,16 @@ export const withdrawApplication = async (req, res, next) => {
     });
     await application.save();
 
-    return sendSuccess(res, { application }, "Application withdrawn successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Application withdrawn successfully",
+      application,
+    });
+  } catch (err) {
+    console.error("Withdraw Application Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}

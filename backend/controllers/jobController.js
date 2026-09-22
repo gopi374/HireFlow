@@ -1,16 +1,16 @@
-import Job from "../models/Job.js";
+﻿import Job from "../models/Job.js";
 import Company from "../models/Company.js";
-import { sendSuccess, sendError, getPagination } from "../utils/response.js";
-import { logAudit } from "../utils/audit.js";
+import { getPagination } from "../utils/response.js";
 
-export const getJobs = async (req, res, next) => {
+// GET All Jobs with search, filters, and pagination
+export async function getJobs(req, res) {
   try {
     const { page, limit, skip } = getPagination(req.query);
     const { search, location, workMode, employmentType, skills, minSalary, companyId, status, sort } = req.query;
 
     const filter = {};
 
-    // Default to PUBLISHED unless recruiter/admin is asking with specific status
+    // Candidates and public visitors only see PUBLISHED jobs
     if (status) {
       filter.status = status;
     } else if (!req.user || req.user.role === "CANDIDATE") {
@@ -21,10 +21,12 @@ export const getJobs = async (req, res, next) => {
     if (location) filter.location = { $regex: location, $options: "i" };
     if (workMode) filter.workMode = workMode;
     if (employmentType) filter.employmentType = employmentType;
+
     if (skills) {
       const skillsArray = skills.split(",").map((s) => s.trim().toLowerCase());
       filter.skills = { $in: skillsArray };
     }
+
     if (minSalary) {
       filter["salary.max"] = { $gte: Number(minSalary) };
     }
@@ -39,198 +41,313 @@ export const getJobs = async (req, res, next) => {
     if (sort === "oldest") sortOption = { createdAt: 1 };
 
     const [jobs, total] = await Promise.all([
-      Job.find(filter).populate("company", "name logo location industry verificationStatus").sort(sortOption).skip(skip).limit(limit),
+      Job.find(filter)
+        .populate("company", "name logo location industry verificationStatus")
+        .sort(sortOption)
+        .skip(skip)
+        .limit(limit),
       Job.countDocuments(filter),
     ]);
 
-    return sendSuccess(res, jobs, "Jobs fetched successfully", 200, {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
+    return res.status(200).json({
+      success: true,
+      message: "Jobs fetched successfully",
+      data: jobs,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error("Get Jobs Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const getJobById = async (req, res, next) => {
+// GET Job by ID
+export async function getJobById(req, res) {
+  const { jobId } = req.params;
+
   try {
-    const job = await Job.findById(req.params.jobId)
+    const job = await Job.findById(jobId)
       .populate("company", "name description logo website location industry verificationStatus")
       .populate("recruiter", "name email");
 
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
-    // If job is not published, only the recruiter/admin can view it
+    // Only allow recruiter/admin to see unpublished jobs
     if (job.status !== "PUBLISHED") {
       if (!req.user || (req.user.role !== "ADMIN" && job.recruiter._id.toString() !== req.user._id.toString())) {
-        return sendError(res, "Job is not available for public view", 403, "FORBIDDEN");
+        return res.status(403).json({
+          success: false,
+          message: "Job is not available for public view",
+        });
       }
     }
 
-    return sendSuccess(res, { job }, "Job details fetched");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      job,
+    });
+  } catch (err) {
+    console.error("Get Job By ID Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const createJob = async (req, res, next) => {
+// CREATE New Job
+export async function createJob(req, res) {
+  const {
+    title,
+    companyId,
+    description,
+    responsibilities,
+    requirements,
+    skills,
+    location,
+    workMode,
+    employmentType,
+    experience,
+    salary,
+    deadline,
+    status = "DRAFT",
+  } = req.body || {};
+
+  if (!title || !companyId || !description || !location) {
+    return res.status(400).json({
+      success: false,
+      message: "Title, company, description, and location are required",
+    });
+  }
+
   try {
-    const {
-      title,
-      companyId,
-      description,
-      responsibilities,
-      requirements,
-      skills,
-      location,
-      workMode,
-      employmentType,
-      experience,
-      salary,
-      deadline,
-      status = "DRAFT",
-    } = req.body;
-
-    if (!title || !companyId || !description || !location) {
-      return sendError(res, "Title, company, description, and location are required.", 400, "MISSING_FIELDS");
-    }
-
     const company = await Company.findById(companyId);
     if (!company) {
-      return sendError(res, "Company not found.", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
     }
 
-    // Verify recruiter belongs to the company
-    const isAssociated = company.owner.toString() === req.user._id.toString() || company.recruiterIds.some((id) => id.toString() === req.user._id.toString());
-    if (!isAssociated && req.user.role !== "ADMIN") {
-      return sendError(res, "You are not authorized to post jobs for this company.", 403, "FORBIDDEN");
+    // Check if recruiter belongs to company or is admin
+    const isOwner = company.owner.toString() === req.user._id.toString();
+    const isRecruiter = company.recruiterIds?.some((id) => id.toString() === req.user._id.toString());
+    const isAdmin = req.user.role === "ADMIN";
+
+    if (!isOwner && !isRecruiter && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to post jobs for this company",
+      });
     }
 
-    const formattedSkills = Array.isArray(skills) ? skills.map((s) => s.trim().toLowerCase()) : [];
+    const formattedSkills = Array.isArray(skills)
+      ? skills.map((s) => s.trim().toLowerCase())
+      : typeof skills === "string"
+      ? skills.split(",").map((s) => s.trim().toLowerCase())
+      : [];
 
     const job = await Job.create({
-      title,
+      title: title.trim(),
       company: companyId,
       recruiter: req.user._id,
       description,
-      responsibilities,
-      requirements,
+      responsibilities: responsibilities || [],
+      requirements: requirements || [],
       skills: formattedSkills,
       location,
-      workMode,
-      employmentType,
+      workMode: workMode || "HYBRID",
+      employmentType: employmentType || "FULL_TIME",
       experience,
       salary,
       deadline,
       status,
     });
 
-    await logAudit({ actor: req.user._id, action: "JOB_CREATED", entityType: "Job", entityId: job._id, req });
 
-    return sendSuccess(res, { job }, "Job created successfully", 201);
-  } catch (error) {
-    next(error);
+    return res.status(201).json({
+      success: true,
+      message: "Job created successfully",
+      job,
+    });
+  } catch (err) {
+    console.error("Create Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const updateJob = async (req, res, next) => {
+// UPDATE Job
+export async function updateJob(req, res) {
+  const { jobId } = req.params;
+
   try {
-    const { jobId } = req.params;
     const job = await Job.findById(jobId);
-
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
     if (job.status === "ARCHIVED") {
-      return sendError(res, "Archived jobs cannot be modified", 400, "JOB_ARCHIVED");
+      return res.status(400).json({
+        success: false,
+        message: "Archived jobs cannot be modified",
+      });
     }
 
     if (job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "You are not authorized to update this job", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this job",
+      });
     }
 
-    const updatedJob = await Job.findByIdAndUpdate(jobId, { $set: req.body }, { new: true, runValidators: true });
+    const updatedJob = await Job.findByIdAndUpdate(
+      jobId,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
 
-    await logAudit({ actor: req.user._id, action: "JOB_UPDATED", entityType: "Job", entityId: job._id, req });
 
-    return sendSuccess(res, { job: updatedJob }, "Job updated successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Job updated successfully",
+      job: updatedJob,
+    });
+  } catch (err) {
+    console.error("Update Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const publishJob = async (req, res, next) => {
+// PUBLISH Job
+export async function publishJob(req, res) {
+  const { jobId } = req.params;
+
   try {
-    const { jobId } = req.params;
     const job = await Job.findById(jobId);
-
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
     if (job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to publish this job", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to publish this job",
+      });
     }
 
     job.status = "PUBLISHED";
     await job.save();
 
-    await logAudit({ actor: req.user._id, action: "JOB_PUBLISHED", entityType: "Job", entityId: job._id, req });
 
-    return sendSuccess(res, { job }, "Job published successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Job published successfully",
+      job,
+    });
+  } catch (err) {
+    console.error("Publish Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const closeJob = async (req, res, next) => {
+// CLOSE Job
+export async function closeJob(req, res) {
+  const { jobId } = req.params;
+
   try {
-    const { jobId } = req.params;
     const job = await Job.findById(jobId);
-
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
     if (job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to close this job", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to close this job",
+      });
     }
 
     job.status = "CLOSED";
     await job.save();
 
-    await logAudit({ actor: req.user._id, action: "JOB_CLOSED", entityType: "Job", entityId: job._id, req });
 
-    return sendSuccess(res, { job }, "Job closed successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Job closed successfully",
+      job,
+    });
+  } catch (err) {
+    console.error("Close Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}
 
-export const deleteJob = async (req, res, next) => {
+// DELETE Job
+export async function deleteJob(req, res) {
+  const { jobId } = req.params;
+
   try {
-    const { jobId } = req.params;
     const job = await Job.findById(jobId);
-
     if (!job) {
-      return sendError(res, "Job not found", 404, "NOT_FOUND");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found",
+      });
     }
 
     if (job.recruiter.toString() !== req.user._id.toString() && req.user.role !== "ADMIN") {
-      return sendError(res, "Not authorized to delete this job", 403, "FORBIDDEN");
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to delete this job",
+      });
     }
 
     await Job.findByIdAndDelete(jobId);
 
-    await logAudit({ actor: req.user._id, action: "JOB_DELETED", entityType: "Job", entityId: jobId, req });
 
-    return sendSuccess(res, null, "Job deleted successfully");
-  } catch (error) {
-    next(error);
+    return res.status(200).json({
+      success: true,
+      message: "Job deleted successfully",
+    });
+  } catch (err) {
+    console.error("Delete Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
   }
-};
+}

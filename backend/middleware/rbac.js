@@ -1,22 +1,18 @@
-import { sendError } from "../utils/response.js";
-
-// Role-based authorization middleware
-export const authorize = (...roles) => {
+// Role-based Access Control (RBAC) middleware
+export function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return sendError(
-        res,
-        `Access forbidden. Required role(s): ${roles.join(", ")}. Your role: ${req.user?.role || "ANONYMOUS"}`,
-        403,
-        "FORBIDDEN_ROLE"
-      );
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: Requires role [${roles.join(", ")}]. Your role is ${req.user?.role || "GUEST"}`,
+      });
     }
     next();
   };
-};
+}
 
-// Resource ownership check utility helper
-export const checkOwnership = (resourceUserId, currentUserId, currentUserRole) => {
+// Check if user owns the given resource or is admin
+export function checkOwnership(resourceUserId, currentUserId, currentUserRole) {
   if (currentUserRole === "ADMIN") return true;
-  return resourceUserId.toString() === currentUserId.toString();
-};
+  return resourceUserId?.toString() === currentUserId?.toString();
+}

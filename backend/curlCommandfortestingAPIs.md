@@ -1,19 +1,28 @@
-# HireFlow ATS — Complete curl.exe API Testing Guide
+# HireFlow ATS — Complete API Testing Guide
 
 Base URL: `http://localhost:5000/api/v1`
+
+> [!TIP]
+> **For Windows PowerShell Users:**
+> - In PowerShell, `\` is NOT the line-continuation character (PowerShell uses backtick `` ` ``).
+> - Also, double quotes inside JSON must be escaped `\"` when using `curl.exe`.
+> - **Recommended in PowerShell:** Use `Invoke-RestMethod` (`irm`) or the single-line `curl.exe` commands below!
 
 ---
 
 ## 1. System Health & Info
 
 ### Check API Health
-```bash
+**PowerShell:**
+```powershell
+irm http://localhost:5000/health
+# or with curl.exe:
 curl.exe -X GET http://localhost:5000/health
 ```
 
-### Check Server Status
+**Bash / macOS:**
 ```bash
-curl.exe -X GET http://localhost:5000/
+curl -X GET http://localhost:5000/health
 ```
 
 ---
@@ -21,8 +30,17 @@ curl.exe -X GET http://localhost:5000/
 ## 2. Authentication
 
 ### Register Candidate
+**PowerShell (irm - Recommended):**
+```powershell
+irm http://localhost:5000/api/v1/auth/register -Method Post -ContentType "application/json" -Body '{"name":"John Candidate","email":"candidate@example.com","password":"Password123!","role":"CANDIDATE","phone":"+1234567890"}'
+```
+**PowerShell (curl.exe):**
+```powershell
+curl.exe -X POST http://localhost:5000/api/v1/auth/register -H "Content-Type: application/json" -d "{\"name\":\"John Candidate\",\"email\":\"candidate@example.com\",\"password\":\"Password123!\",\"role\":\"CANDIDATE\",\"phone\":\"+1234567890\"}"
+```
+**Bash:**
 ```bash
-curl.exe -X POST http://localhost:5000/api/v1/auth/register \
+curl -X POST http://localhost:5000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Candidate",
@@ -33,9 +51,16 @@ curl.exe -X POST http://localhost:5000/api/v1/auth/register \
   }'
 ```
 
+---
+
 ### Register Recruiter
+**PowerShell (irm):**
+```powershell
+irm http://localhost:5000/api/v1/auth/register -Method Post -ContentType "application/json" -Body '{"name":"Sarah Recruiter","email":"recruiter@example.com","password":"Password123!","role":"RECRUITER","phone":"+1987654321"}'
+```
+**Bash:**
 ```bash
-curl.exe -X POST http://localhost:5000/api/v1/auth/register \
+curl -X POST http://localhost:5000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Sarah Recruiter",
@@ -46,9 +71,16 @@ curl.exe -X POST http://localhost:5000/api/v1/auth/register \
   }'
 ```
 
+---
+
 ### Register Admin
+**PowerShell (irm):**
+```powershell
+irm http://localhost:5000/api/v1/auth/register -Method Post -ContentType "application/json" -Body '{"name":"Platform Admin","email":"admin@example.com","password":"AdminPassword123!","role":"ADMIN"}'
+```
+**Bash:**
 ```bash
-curl.exe -X POST http://localhost:5000/api/v1/auth/register \
+curl -X POST http://localhost:5000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Platform Admin",
@@ -58,9 +90,23 @@ curl.exe -X POST http://localhost:5000/api/v1/auth/register \
   }'
 ```
 
+---
+
 ### Login
+**PowerShell (irm):**
+```powershell
+$res = irm http://localhost:5000/api/v1/auth/login -Method Post -ContentType "application/json" -Body '{"email":"candidate@example.com","password":"Password123!"}'
+$token = $res.data.tokens.accessToken
+$refreshToken = $res.data.tokens.refreshToken
+$res
+```
+**PowerShell (curl.exe):**
+```powershell
+curl.exe -X POST http://localhost:5000/api/v1/auth/login -H "Content-Type: application/json" -d "{\"email\":\"candidate@example.com\",\"password\":\"Password123!\"}"
+```
+**Bash:**
 ```bash
-curl.exe -X POST http://localhost:5000/api/v1/auth/login \
+curl -X POST http://localhost:5000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "candidate@example.com",
@@ -68,40 +114,49 @@ curl.exe -X POST http://localhost:5000/api/v1/auth/login \
   }'
 ```
 
+---
+
 ### Refresh Access Token
+**PowerShell (irm):**
+```powershell
+irm http://localhost:5000/api/v1/auth/refresh -Method Post -ContentType "application/json" -Body "{`\"refreshToken`\":`\"$refreshToken`\"}"
+```
+**Bash:**
 ```bash
-curl.exe -X POST http://localhost:5000/api/v1/auth/refresh \
+curl -X POST http://localhost:5000/api/v1/auth/refresh \
   -H "Content-Type: application/json" \
-  -d '{
-    "refreshToken": "<YOUR_REFRESH_TOKEN>"
-  }'
+  -d '{"refreshToken": "<YOUR_REFRESH_TOKEN>"}'
 ```
 
+---
+
 ### Get Authenticated User Profile (Me)
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/auth/me -Headers @{ Authorization = "Bearer $token" }
+# or curl.exe:
+curl.exe -X GET http://localhost:5000/api/v1/auth/me -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
+```
+**Bash:**
 ```bash
-curl.exe -X GET http://localhost:5000/api/v1/auth/me \
+curl -X GET http://localhost:5000/api/v1/auth/me \
   -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
 ```
 
+---
+
 ### Change Password
-```bash
-curl.exe -X PUT http://localhost:5000/api/v1/auth/change-password \
-  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "currentPassword": "Password123!",
-    "newPassword": "NewPassword123!"
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/auth/change-password -Method Put -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body '{"currentPassword":"Password123!","newPassword":"NewPassword123!"}'
 ```
 
+---
+
 ### Logout
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/auth/logout \
-  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refreshToken": "<YOUR_REFRESH_TOKEN>"
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/auth/logout -Method Post -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body "{`\"refreshToken`\":`\"$refreshToken`\"}"
 ```
 
 ---
@@ -109,76 +164,39 @@ curl.exe -X POST http://localhost:5000/api/v1/auth/logout \
 ## 3. User & Candidate Profile
 
 ### Update Basic User Info
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/users/me \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "John Doe",
-    "phone": "+1122334455"
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/users/me -Method Patch -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body '{"name":"John Doe","phone":"+1122334455"}'
 ```
 
 ### Update Candidate Detailed Profile
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/users/me/candidate-profile \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "headline": "Senior Fullstack Developer",
-    "summary": "5+ years experienced Node.js & React developer.",
-    "location": "San Francisco, CA",
-    "skills": ["javascript", "typescript", "nodejs", "react", "mongodb"],
-    "experience": [
-      {
-        "title": "Backend Engineer",
-        "company": "Tech Corp",
-        "location": "Remote",
-        "startDate": "2022-01-01",
-        "current": true,
-        "description": "Building scalable microservices and ATS workflows."
-      }
-    ],
-    "education": [
-      {
-        "institution": "State University",
-        "degree": "B.S.",
-        "fieldOfStudy": "Computer Science",
-        "startYear": 2017,
-        "endYear": 2021
-      }
-    ],
-    "links": {
-      "github": "https://github.com/johndoe",
-      "linkedin": "https://linkedin.com/in/johndoe",
-      "portfolio": "https://johndoe.dev"
-    }
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/users/me/candidate-profile -Method Patch -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body '{"headline":"Senior Fullstack Developer","summary":"5+ years experienced developer","location":"San Francisco, CA","skills":["javascript","typescript","nodejs","mongodb"]}'
 ```
 
-### Upload Resume (Multipart Form Data)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/users/me/resume \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>" \
-  -F "resume=@/path/to/your/resume.pdf"
+### Upload Resume
+**PowerShell (curl.exe):**
+```powershell
+curl.exe -X POST http://localhost:5000/api/v1/users/me/resume -H "Authorization: Bearer <CANDIDATE_TOKEN>" -F "resume=@C:\path\to\your\resume.pdf"
 ```
 
 ### Toggle Save / Bookmark Job
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/users/jobs/<JOB_ID>/save \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>"
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/users/jobs/<JOB_ID>/save -Method Post -Headers @{ Authorization = "Bearer $token" }
 ```
 
-### Get My Applications (Candidate)
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/users/me/applications?page=1&limit=10" \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>"
+### Get My Applications
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/users/me/applications?page=1&limit=10" -Headers @{ Authorization = "Bearer $token" }
 ```
 
-### Get My Scheduled Interviews (Candidate)
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/users/me/interviews?page=1&limit=10" \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>"
+### Get My Interviews
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/users/me/interviews?page=1&limit=10" -Headers @{ Authorization = "Bearer $token" }
 ```
 
 ---
@@ -186,50 +204,35 @@ curl.exe -X GET "http://localhost:5000/api/v1/users/me/interviews?page=1&limit=1
 ## 4. Companies
 
 ### Create Company (Recruiter / Admin)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/companies \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Acme Innovations",
-    "description": "Leading cloud software provider",
-    "website": "https://acme.com",
-    "location": "New York, NY",
-    "industry": "Software & Technology",
-    "size": "50-200"
-  }'
+**PowerShell:**
+```powershell
+$company = irm http://localhost:5000/api/v1/companies -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"name":"Acme Innovations","description":"Leading tech company","website":"https://acme.com","location":"New York, NY","industry":"Technology","size":"50-200"}'
+$companyId = $company.data.company._id
+$company
 ```
 
 ### List Companies (Public)
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/companies?page=1&limit=10&search=Acme"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/companies?page=1&limit=10&search=Acme"
 ```
 
 ### Get Company Details (Public)
-```bash
-curl.exe -X GET http://localhost:5000/api/v1/companies/<COMPANY_ID>
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/companies/<COMPANY_ID>
 ```
 
 ### Update Company (Recruiter / Admin)
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/companies/<COMPANY_ID> \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "Updated global cloud software solutions provider",
-    "size": "200-500"
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/companies/<COMPANY_ID> -Method Patch -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"size":"200-500"}'
 ```
 
 ### Request Company Verification (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/companies/<COMPANY_ID>/verification \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "documents": ["https://storage.example.com/biz-reg-doc.pdf"],
-    "notes": "Official incorporation certificate attached."
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/companies/<COMPANY_ID>/verification -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"documents":["https://example.com/doc.pdf"],"notes":"Incorporation certificate attached."}'
 ```
 
 ---
@@ -237,63 +240,41 @@ curl.exe -X POST http://localhost:5000/api/v1/companies/<COMPANY_ID>/verificatio
 ## 5. Jobs
 
 ### Create Job Draft (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/jobs \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Senior Backend Developer",
-    "companyId": "<COMPANY_ID>",
-    "description": "We are seeking a seasoned Node.js developer.",
-    "responsibilities": ["Design REST APIs", "Maintain DB performance"],
-    "requirements": ["3+ years Node.js experience", "MongoDB expertise"],
-    "skills": ["nodejs", "mongodb", "typescript", "express"],
-    "location": "Remote",
-    "workMode": "REMOTE",
-    "employmentType": "FULL_TIME",
-    "experience": { "min": 3, "max": 6 },
-    "salary": { "min": 90000, "max": 130000, "currency": "USD" },
-    "deadline": "2026-12-31T23:59:59Z",
-    "status": "DRAFT"
-  }'
+**PowerShell:**
+```powershell
+$job = irm http://localhost:5000/api/v1/jobs -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body "{\"title\":\"Senior Backend Developer\",\"companyId\":\"$companyId\",\"description\":\"We are seeking a seasoned Node.js developer.\",\"location\":\"Remote\",\"workMode\":\"REMOTE\",\"employmentType\":\"FULL_TIME\",\"skills\":[\"nodejs\",\"mongodb\",\"typescript\"],\"salary\":{\"min\":90000,\"max\":130000,\"currency\":\"USD\"}}"
+$jobId = $job.data.job._id
+$job
 ```
 
 ### Publish Job (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/jobs/<JOB_ID>/publish \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/jobs/$jobId/publish" -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" }
 ```
 
 ### Search & Filter Jobs (Public)
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/jobs?search=Backend&location=Remote&workMode=REMOTE&employmentType=FULL_TIME&skills=nodejs,mongodb&page=1&limit=10"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/jobs?search=Backend&location=Remote&workMode=REMOTE&employmentType=FULL_TIME&page=1&limit=10"
 ```
 
 ### Get Job by ID (Public)
-```bash
-curl.exe -X GET http://localhost:5000/api/v1/jobs/<JOB_ID>
-```
-
-### Update Job (Recruiter)
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/jobs/<JOB_ID> \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "salary": { "min": 95000, "max": 140000, "currency": "USD" }
-  }'
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/jobs/$jobId"
 ```
 
 ### Close Job (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/jobs/<JOB_ID>/close \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/jobs/$jobId/close" -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" }
 ```
 
 ### Delete Job (Recruiter / Admin)
-```bash
-curl.exe -X DELETE http://localhost:5000/api/v1/jobs/<JOB_ID> \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/jobs/$jobId" -Method Delete -Headers @{ Authorization = "Bearer $recruiterToken" }
 ```
 
 ---
@@ -301,57 +282,42 @@ curl.exe -X DELETE http://localhost:5000/api/v1/jobs/<JOB_ID> \
 ## 6. Applications
 
 ### Candidate Apply to Job
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/jobs/<JOB_ID>/apply \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "resumeUrl": "/uploads/resume-sample.pdf",
-    "coverLetter": "I am excited to apply for this backend developer position.",
-    "answers": [
-      { "question": "Years of Node.js experience?", "answer": "4 years" }
-    ]
-  }'
+**PowerShell:**
+```powershell
+$app = irm "http://localhost:5000/api/v1/jobs/$jobId/apply" -Method Post -Headers @{ Authorization = "Bearer $candidateToken" } -ContentType "application/json" -Body '{"resumeUrl":"/uploads/resume-sample.pdf","coverLetter":"I am excited to apply for this backend developer position.","answers":[{"question":"Years of experience?","answer":"4 years"}]}'
+$applicationId = $app.data.application._id
+$app
 ```
 
 ### Recruiter View Applications for Job
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/jobs/<JOB_ID>/applications?status=APPLIED&page=1&limit=10" \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/jobs/$jobId/applications?page=1&limit=10" -Headers @{ Authorization = "Bearer $recruiterToken" }
 ```
 
 ### Get Application Details
-```bash
-curl.exe -X GET http://localhost:5000/api/v1/applications/<APPLICATION_ID> \
-  -H "Authorization: Bearer <RECRUITER_OR_CANDIDATE_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/applications/$applicationId" -Headers @{ Authorization = "Bearer $recruiterToken" }
 ```
 
-### Update Application Status (Recruiter Pipeline Progression)
+### Update Application Status (Recruiter Stage Pipeline)
 *Allowed Transitions:* `APPLIED` → `SCREENING` → `SHORTLISTED` → `INTERVIEW` → `SELECTED` / `REJECTED`
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/applications/<APPLICATION_ID>/status \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "SHORTLISTED",
-    "reason": "Strong portfolio and relevant experience"
-  }'
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/applications/$applicationId/status" -Method Patch -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"status":"SHORTLISTED","reason":"Strong candidate profile"}'
 ```
 
-### Add Recruiter Internal Note
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/applications/<APPLICATION_ID>/notes \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "note": "Passed initial resume screening with flying colors. Recommend for technical round."
-  }'
+### Add Recruiter Note
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/applications/$applicationId/notes" -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"note":"Passed initial screening. Candidate has strong Node.js knowledge."}'
 ```
 
 ### Candidate Withdraw Application
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/applications/<APPLICATION_ID>/withdraw \
-  -H "Authorization: Bearer <CANDIDATE_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/applications/$applicationId/withdraw" -Method Post -Headers @{ Authorization = "Bearer $candidateToken" }
 ```
 
 ---
@@ -359,89 +325,57 @@ curl.exe -X POST http://localhost:5000/api/v1/applications/<APPLICATION_ID>/with
 ## 7. Interviews
 
 ### Schedule Interview (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/interviews \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "applicationId": "<APPLICATION_ID>",
-    "scheduledAt": "2026-10-15T14:00:00Z",
-    "durationMinutes": 60,
-    "type": "TECHNICAL",
-    "mode": "ONLINE",
-    "meetingUrl": "https://meet.google.com/abc-defg-hij"
-  }'
+**PowerShell:**
+```powershell
+$interview = irm http://localhost:5000/api/v1/interviews -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body "{\"applicationId\":\"$applicationId\",\"scheduledAt\":\"2026-10-15T14:00:00Z\",\"durationMinutes\":60,\"type\":\"TECHNICAL\",\"mode\":\"ONLINE\",\"meetingUrl\":\"https://meet.google.com/abc-defg-hij\"}"
+$interviewId = $interview.data.interview._id
+$interview
 ```
 
 ### List Interviews
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/interviews?status=SCHEDULED&page=1&limit=10" \
-  -H "Authorization: Bearer <USER_TOKEN>"
-```
-
-### Get Interview Details
-```bash
-curl.exe -X GET http://localhost:5000/api/v1/interviews/<INTERVIEW_ID> \
-  -H "Authorization: Bearer <USER_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/interviews?status=SCHEDULED&page=1&limit=10" -Headers @{ Authorization = "Bearer $token" }
 ```
 
 ### Reschedule / Update Interview (Recruiter)
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/interviews/<INTERVIEW_ID> \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scheduledAt": "2026-10-16T15:30:00Z",
-    "status": "RESCHEDULED"
-  }'
-```
-
-### Cancel Interview (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/interviews/<INTERVIEW_ID>/cancel \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Interviewer schedule conflict. Will reschedule shortly."
-  }'
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/interviews/$interviewId" -Method Patch -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"scheduledAt":"2026-10-16T15:30:00Z","status":"RESCHEDULED"}'
 ```
 
 ### Submit Interview Evaluation (Recruiter)
-```bash
-curl.exe -X POST http://localhost:5000/api/v1/interviews/<INTERVIEW_ID>/evaluation \
-  -H "Authorization: Bearer <RECRUITER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "rating": 5,
-    "feedback": "Exceptional problem-solving skills and clean code practices.",
-    "strengths": ["System Design", "Node.js concurrency", "Communication"],
-    "weaknesses": ["None notable"],
-    "decision": "STRONG_HIRE",
-    "shareableWithCandidate": true,
-    "candidateFeedback": "Great technical performance during coding session!"
-  }'
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/interviews/$interviewId/evaluation" -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"rating":5,"feedback":"Excellent problem-solving and system design skills.","decision":"STRONG_HIRE","shareableWithCandidate":true,"candidateFeedback":"Outstanding coding interview performance!"}'
+```
+
+### Cancel Interview (Recruiter)
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/interviews/$interviewId/cancel" -Method Post -Headers @{ Authorization = "Bearer $recruiterToken" } -ContentType "application/json" -Body '{"reason":"Schedule conflict"}'
 ```
 
 ---
 
 ## 8. Notifications
 
-### Get My Notifications
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/notifications?page=1&limit=10" \
-  -H "Authorization: Bearer <USER_TOKEN>"
+### Get Notifications & Unread Count
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/notifications?page=1&limit=10" -Headers @{ Authorization = "Bearer $token" }
 ```
 
 ### Mark Notification as Read
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/notifications/<NOTIFICATION_ID>/read \
-  -H "Authorization: Bearer <USER_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/notifications/<NOTIFICATION_ID>/read" -Method Patch -Headers @{ Authorization = "Bearer $token" }
 ```
 
 ### Mark All Notifications as Read
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/notifications/read-all \
-  -H "Authorization: Bearer <USER_TOKEN>"
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/notifications/read-all -Method Patch -Headers @{ Authorization = "Bearer $token" }
 ```
 
 ---
@@ -449,40 +383,31 @@ curl.exe -X PATCH http://localhost:5000/api/v1/notifications/read-all \
 ## 9. Admin & Moderation
 
 ### Get Platform Statistics
-```bash
-curl.exe -X GET http://localhost:5000/api/v1/admin/stats \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/admin/stats -Headers @{ Authorization = "Bearer $adminToken" }
 ```
 
 ### Search & List Users
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/admin/users?role=CANDIDATE&status=ACTIVE&page=1&limit=10" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/admin/users?role=CANDIDATE&status=ACTIVE&page=1&limit=10" -Headers @{ Authorization = "Bearer $adminToken" }
 ```
 
 ### Suspend / Reactivate User
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/admin/users/<USER_ID>/status \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "SUSPENDED"
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/admin/users/<USER_ID>/status -Method Patch -Headers @{ Authorization = "Bearer $adminToken" } -ContentType "application/json" -Body '{"status":"SUSPENDED"}'
 ```
 
 ### Verify / Reject Company
-```bash
-curl.exe -X PATCH http://localhost:5000/api/v1/admin/companies/<COMPANY_ID>/verification \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "verificationStatus": "VERIFIED",
-    "verificationNotes": "Company registration verified successfully."
-  }'
+**PowerShell:**
+```powershell
+irm http://localhost:5000/api/v1/admin/companies/<COMPANY_ID>/verification -Method Patch -Headers @{ Authorization = "Bearer $adminToken" } -ContentType "application/json" -Body '{"verificationStatus":"VERIFIED","verificationNotes":"Verification documents reviewed and accepted."}'
 ```
 
-### View Platform Audit Logs
-```bash
-curl.exe -X GET "http://localhost:5000/api/v1/admin/audit-logs?entityType=Job&page=1&limit=20" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
+### View Audit Logs
+**PowerShell:**
+```powershell
+irm "http://localhost:5000/api/v1/admin/audit-logs?page=1&limit=20" -Headers @{ Authorization = "Bearer $adminToken" }
 ```
