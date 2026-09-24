@@ -1,0 +1,33 @@
+.parallax {
+  background-color: aquamarine;
+  position: relative;
+  overflow: hidden;
+}
+
+.scroller {
+  padding: 5px 0px;
+  height: 80px;
+  display: flex;
+  white-space: nowrap;
+  text-align: center;
+  font-family: sans-serif;
+  font-size: 1.25px;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+}
+
+.custom-scroll-text {
+  font-size: 30px;
+}
+
+.scroller span {
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .scroller {
+    font-size: 5rem;
+    line-height: 5rem;
+  }
+}

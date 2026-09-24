@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "main-font";
+  src: url("./assets/fonts/Cormorant_Garamond/CormorantGaramond-Italic-VariableFont_wght.ttf")
+    format("truetype");
+  font-weight: 100 900;
+  font-style: italic;
+}
+
+.special-font {
+  font-family: "main-font", serif;
+}
