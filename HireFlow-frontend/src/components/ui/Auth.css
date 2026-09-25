@@ -1,0 +1,303 @@
+* {
+  box-sizing: border-box;
+}
+
+.auth-page {
+    padding-bottom: 0;
+  min-height: 90vh;
+  display: flex;
+  font-family: Arial, sans-serif;
+  color: #11284d;
+}
+
+.auth-promo {
+  width: 50%;
+  padding: 5px 5%;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #f4fbff, #e6f6ff);
+}
+
+.auth-card {
+  width: 50%;
+  padding: 5px 5%;
+  background: #fff;
+}
+
+.auth-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 32px;
+  font-weight: 800;
+  color: #102c55;
+}
+
+.auth-logo > span > span {
+  color: #06ae79;
+}
+
+.logo-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 34px;
+  font-weight: bold;
+  background: linear-gradient(135deg, #0878e8 45%, #06b879 46%);
+}
+
+.promo-content {
+  margin-top: 48px;
+}
+
+.promo-content h1 {
+  font-size: 38px;
+  line-height: 1.12;
+  margin: 0 0 14px;
+}
+
+.promo-content p {
+  color: #566b8c;
+  line-height: 1.5;
+}
+
+.benefits {
+  margin-top: 28px;
+  display: grid;
+  gap: 22px;
+}
+
+.benefits > div {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.benefits b {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #00ac7b;
+  background: #d8f8ee;
+  font-size: 27px;
+}
+
+.benefits span {
+  display: grid;
+  gap: 6px;
+}
+
+.benefits small {
+  color: #607391;
+  line-height: 1.4;
+}
+
+.promo-art {
+  position: absolute;
+  right: 12%;
+  bottom: 8%;
+  font-size: 90px;
+  transform: rotate(-15deg);
+}
+
+.top-link {
+  text-align: right;
+  color: #657692;
+  font-size: 12px;
+}
+
+.top-link a,
+.terms a,
+.form-options a {
+  color: #1473e6;
+  text-decoration: none;
+}
+
+.top-link a {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 8px 20px;
+  border: 1px solid #e0e8f2;
+  border-radius: 20px;
+}
+
+.form-wrapper {
+  max-width: 435px;
+  margin: 20px auto 0;
+  text-align: center;
+}
+
+.form-wrapper .auth-logo {
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.form-wrapper h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.subtitle {
+  color: #647794;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 35px 0 18px;
+}
+
+.auth-tabs a {
+  flex: 1;
+  padding: 11px;
+  border-radius: 11px;
+  background: #f4f7fa;
+  color: #1d2738;
+  font-size: 12px;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.auth-tabs a.active,
+.submit-btn {
+  color: white;
+  background: #2376e8;
+}
+
+.role-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.role-tabs button {
+  cursor: pointer;
+  transition: 0.2s ease;
+  flex: 1;
+  min-height: 61px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  text-align: left;
+  color: #526582;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.role-tabs button:hover {
+  border-color: #428cff;
+}
+
+.role-tabs button.selected {
+  border-color: #428cff;
+  color: #1473e6;
+  background: #f7fbff;
+}
+
+.role-tabs strong {
+  font-size: 11px;
+}
+
+.role-tabs small {
+  display: block;
+  margin-top: 5px;
+  color: #8996a9;
+  font-weight: normal;
+}
+
+form {
+  display: grid;
+  gap: 9px;
+}
+
+form input:not([type="checkbox"]) {
+  width: 100%;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid #e1e8f1;
+  border-radius: 9px;
+  outline: none;
+  color: #263d5c;
+}
+
+form input:focus {
+  border-color: #3985ef;
+}
+
+.submit-btn,
+.google-btn {
+  height: 38px;
+  border: 0;
+  border-radius: 9px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.submit-btn {
+  margin-top: 2px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 14px 0;
+  color: #71809a;
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #e4e9ef;
+}
+
+.google-btn {
+  width: 100%;
+  color: #435574;
+  background: white;
+  border: 1px solid #dfe6ef;
+}
+
+.terms {
+  color: #8693a6;
+  font-size: 10px;
+  margin-top: 16px;
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #73819a;
+}
+
+.form-options input {
+  accent-color: #2376e8;
+}
+
+.login-wrapper {
+  margin-top: 65px;
+}
+
+@media (max-width: 800px) {
+  .auth-promo {
+    display: none;
+  }
+
+  .auth-card {
+    width: 100%;
+    padding: 24px;
+  }
+}

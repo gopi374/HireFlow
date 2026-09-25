@@ -60,8 +60,8 @@ const socialLinks = [
 
 const Footer = () => {
   return (
-    <footer className="border-t border-slate-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-16">
+    <footer className="border-t border-slate-200 bg-gray-200">
+      <div className="mx-auto max-w-5xl px-2 py-2">
 
         {/* Centered content */}
         <div className="flex flex-col items-center">
@@ -90,7 +90,7 @@ const Footer = () => {
           </p>
 
           {/* Social icons */}
-          <div className="mt-7 flex items-center gap-3">
+          <div className="mt-2 flex items-center gap-3">
             {socialLinks.map(({ label, href, icon: Icon }) => (
               <a
                 key={label}
@@ -122,7 +122,7 @@ const Footer = () => {
                 className="text-center sm:text-left"
               >
                 <h3 className="
-                  mb-5
+                  mb-2
                   text-xs
                   font-semibold
                   uppercase
@@ -155,7 +155,7 @@ const Footer = () => {
 
           {/* Bottom section */}
           <div className="
-            mt-14
+            mt-2
             flex
             w-full
             flex-col
@@ -164,7 +164,7 @@ const Footer = () => {
             gap-4
             border-t
             border-slate-200
-            pt-6
+            pt-1
             text-sm
             text-slate-400
             md:flex-row

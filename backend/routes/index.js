@@ -19,4 +19,10 @@ router.use("/interviews", interviewRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/admin", adminRoutes);
 
+router.get("/",(req,res)=>{
+    res.json({
+        res : "welcome to API Routes"
+    })
+})
+
 export default router;

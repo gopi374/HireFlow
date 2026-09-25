@@ -1,6 +1,7 @@
 import Navbar from "./Navbar"
 import Footer from './Footer'
 import Scroller from "./Scroller"
+import { Link } from 'react-router-dom'
 
 const Home = () => {
 
@@ -8,7 +9,7 @@ const Home = () => {
     <div className="bg-white text-gray-900">
       <Navbar/>
 
-      <section id="hero" className="bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <section id="hero" className="bg-gradient-to-br from-green-50 via-white to-blue-50 h-145">
         <div className="max-w-7xl mx-auto px-1 py-3 lg:py-3">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div>
@@ -27,12 +28,12 @@ const Home = () => {
               </p>
 
               <div className="mt-8 flex flex-wrap gap-4">
-                <a
-                  href="/signup"
+                <Link
+                  to="/signup"
                   className="rounded-xl bg-green-700 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-green-800"
                 >
                   Post a Job
-                </a>
+                </Link>
                 <a
                   href="/services"
                   className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-base font-semibold text-gray-800 transition hover:bg-gray-100"
