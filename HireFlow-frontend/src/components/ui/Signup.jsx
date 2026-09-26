@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { registerUser } from '../API/auth'
 import './Auth.css'
 
 const Logo = () => (
@@ -11,6 +12,16 @@ const Logo = () => (
 
 const Signup = () => {
   const [selectedRole, setSelectedRole] = useState('candidate')
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+
   const navigate = useNavigate()
 
   const roles = [
@@ -34,14 +45,58 @@ const Signup = () => {
     },
   ]
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    })
+    if (error) setError('')
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (selectedRole === 'candidate') {
-      navigate('/candidate/dash')
-    } else if (selectedRole === 'recruiter') {
-      navigate('/recruiter/dash')
-    } else {
-      navigate('/candidate/dash')
+    setLoading(true)
+    setError('')
+    setSuccessMsg('')
+
+    const payload = {
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      phone: formData.phone.trim(),
+      role: selectedRole.toUpperCase(), // 'CANDIDATE', 'RECRUITER', 'ADMIN'
+    }
+
+    try {
+      const data = await registerUser(payload)
+
+      if (data.token) {
+        localStorage.setItem('token', data.token)
+      }
+      if (data.tokens?.accessToken) {
+        localStorage.setItem('accessToken', data.tokens.accessToken)
+        localStorage.setItem('refreshToken', data.tokens.refreshToken)
+      }
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
+
+      setSuccessMsg(data.message || 'Account Created Successfully!')
+
+      setTimeout(() => {
+        if (selectedRole === 'candidate') {
+          navigate('/candidate/dash')
+        } else if (selectedRole === 'recruiter') {
+          navigate('/recruiter/dash')
+        } else {
+          navigate('/candidate/dash')
+        }
+      }, 1200)
+    } catch (err) {
+      console.error('Registration Error:', err)
+      setError(err.message || 'Registration failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -95,13 +150,54 @@ const Signup = () => {
             ))}
           </div>
 
+          {error && (
+            <div style={{ color: '#d9534f', backgroundColor: '#fdf7f7', border: '1px solid #d9534f', padding: '10px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>
+              {error}
+            </div>
+          )}
+
+          {successMsg && (
+            <div style={{ color: '#06ae79', backgroundColor: '#e6f8f2', border: '1px solid #06ae79', padding: '10px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>
+              {successMsg}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
-            <input placeholder="♙   Full Name" required />
-            <input type="email" placeholder="✉   Email Address" required />
-            <input type="tel" placeholder="♧   Phone Number" />
-            <input type="password" placeholder="▣   Password" required />
-            <input placeholder="⌖   Location (City)" />
-            <button type="submit" className="submit-btn">Create Account&nbsp; →</button>
+            <input
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="♙   Full Name"
+              required
+            />
+            <input
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="✉   Email Address"
+              required
+            />
+            <input
+              name="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={handleChange}
+              placeholder="♧   Phone Number"
+            />
+            <input
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="▣   Password (min 8 chars)"
+              required
+              minLength={8}
+            />
+    
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? 'Creating Account...' : 'Create Account  →'}
+            </button>
           </form>
 
           <div className="divider"><span>or</span></div>

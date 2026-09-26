@@ -1,6 +1,7 @@
 import './Auth.css'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { loginUser } from '../API/auth'
 
 const Logo = () => (
   <Link to="/" className="auth-logo">
@@ -11,6 +12,13 @@ const Logo = () => (
 
 const Login = () => {
   const [selectedRole, setSelectedRole] = useState('candidate')
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
   const navigate = useNavigate()
 
   const roles = [
@@ -34,14 +42,56 @@ const Login = () => {
     },
   ]
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    })
+    if (error) setError('')
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (selectedRole === 'candidate') {
-      navigate('/candidate/dash')
-    } else if (selectedRole === 'recruiter') {
-      navigate('/recruiter/dash')
-    } else {
-      navigate('/candidate/dash')
+    setLoading(true)
+    setError('')
+    setSuccessMsg('')
+
+    const payload = {
+      email: formData.email.trim(),
+      password: formData.password,
+    }
+
+    try {
+      const data = await loginUser(payload)
+
+      if (data.token) {
+        localStorage.setItem('token', data.token)
+      }
+      if (data.tokens?.accessToken) {
+        localStorage.setItem('accessToken', data.tokens.accessToken)
+        localStorage.setItem('refreshToken', data.tokens.refreshToken)
+      }
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
+
+      setSuccessMsg(data.message || 'Login successful!')
+
+      setTimeout(() => {
+        const userRole = data.user?.role?.toLowerCase() || selectedRole
+        if (userRole === 'candidate') {
+          navigate('/candidate/dash')
+        } else if (userRole === 'recruiter') {
+          navigate('/recruiter/dash')
+        } else {
+          navigate('/candidate/dash')
+        }
+      }, 1000)
+    } catch (err) {
+      console.error('Login Error:', err)
+      setError(err.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -95,10 +145,38 @@ const Login = () => {
             ))}
           </div>
 
+          {error && (
+            <div style={{ color: '#d9534f', backgroundColor: '#fdf7f7', border: '1px solid #d9534f', padding: '10px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>
+              {error}
+            </div>
+          )}
+
+          {successMsg && (
+            <div style={{ color: '#06ae79', backgroundColor: '#e6f8f2', border: '1px solid #06ae79', padding: '10px', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' }}>
+              {successMsg}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
-            <input type="email" placeholder="✉   Email Address" required />
-            <input type="password" placeholder="▣   Password" required />
-            <button type="submit" className="submit-btn">Login Account&nbsp; →</button>
+            <input
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="✉   Email Address"
+              required
+            />
+            <input
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="▣   Password"
+              required
+            />
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login Account  →'}
+            </button>
           </form>
 
           <div className="divider"><span>or</span></div>
