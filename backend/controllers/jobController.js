@@ -1,4 +1,4 @@
-﻿import Job from "../models/Job.js";
+import Job from "../models/Job.js";
 import Company from "../models/Company.js";
 import { getPagination } from "../utils/response.js";
 
@@ -114,80 +114,145 @@ export async function createJob(req, res) {
     title,
     companyId,
     description,
+    summary,
     responsibilities,
     requirements,
     skills,
     location,
     workMode,
     employmentType,
+    type,
     experience,
     salary,
+    salaryMin,
+    salaryMax,
+    currency,
     deadline,
-    status = "DRAFT",
+    status = "PUBLISHED",
   } = req.body || {};
 
-  if (!title || !companyId || !description || !location) {
+  const finalDescription = description || summary || title;
+
+  if (!title || !location) {
     return res.status(400).json({
       success: false,
-      message: "Title, company, description, and location are required",
+      message: "Title and location are required",
     });
   }
 
   try {
-    const company = await Company.findById(companyId);
-    if (!company) {
-      return res.status(404).json({
-        success: false,
-        message: "Company not found",
+    let targetCompany;
+    if (companyId) {
+      targetCompany = await Company.findById(companyId);
+    } else {
+      targetCompany = await Company.findOne({
+        $or: [{ owner: req.user._id }, { recruiterIds: req.user._id }],
       });
     }
 
-    // Check if recruiter belongs to company or is admin
-    const isOwner = company.owner.toString() === req.user._id.toString();
-    const isRecruiter = company.recruiterIds?.some((id) => id.toString() === req.user._id.toString());
-    const isAdmin = req.user.role === "ADMIN";
-
-    if (!isOwner && !isRecruiter && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to post jobs for this company",
+    if (!targetCompany) {
+      targetCompany = await Company.create({
+        name: req.user.name ? `${req.user.name}'s Company` : "HireFlow Enterprise",
+        description: "Technology & Software Development Solutions",
+        location: location || "Remote",
+        owner: req.user._id,
+        recruiterIds: [req.user._id],
+        verificationStatus: "VERIFIED",
       });
     }
 
     const formattedSkills = Array.isArray(skills)
-      ? skills.map((s) => s.trim().toLowerCase())
+      ? skills.map((s) => String(s).trim().toLowerCase())
       : typeof skills === "string"
-      ? skills.split(",").map((s) => s.trim().toLowerCase())
+      ? skills.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    let parsedWorkMode = "HYBRID";
+    if (workMode) {
+      const modeStr = String(workMode).toUpperCase();
+      if (modeStr.includes("REMOTE")) parsedWorkMode = "REMOTE";
+      else if (modeStr.includes("SITE") || modeStr.includes("OFFICE")) parsedWorkMode = "ON_SITE";
+      else parsedWorkMode = "HYBRID";
+    }
+
+    const rawType = employmentType || type;
+    let parsedEmploymentType = "FULL_TIME";
+    if (rawType) {
+      const typeStr = String(rawType).toUpperCase();
+      if (typeStr.includes("PART")) parsedEmploymentType = "PART_TIME";
+      else if (typeStr.includes("CONTRACT")) parsedEmploymentType = "CONTRACT";
+      else if (typeStr.includes("INTERN")) parsedEmploymentType = "INTERNSHIP";
+      else parsedEmploymentType = "FULL_TIME";
+    }
+
+    let parsedSalary = { min: 0, max: 0, currency: currency || "INR" };
+    if (salary && typeof salary === "object") {
+      parsedSalary = {
+        min: Number(salary.min) || 0,
+        max: Number(salary.max) || 0,
+        currency: salary.currency || currency || "INR",
+      };
+    } else if (salaryMin || salaryMax) {
+      parsedSalary = {
+        min: Number(salaryMin) || 0,
+        max: Number(salaryMax) || 0,
+        currency: currency || "INR",
+      };
+    }
+
+    let parsedExperience = { min: 0, max: 0 };
+    if (experience && typeof experience === "object") {
+      parsedExperience = {
+        min: Number(experience.min) || 0,
+        max: Number(experience.max) || 0,
+      };
+    } else if (experience) {
+      const expNum = Number(experience) || 0;
+      parsedExperience = { min: expNum, max: expNum ? expNum + 3 : 0 };
+    }
+
+    const formattedResponsibilities = Array.isArray(responsibilities)
+      ? responsibilities
+      : typeof responsibilities === "string"
+      ? responsibilities.split("\n").map((r) => r.trim()).filter(Boolean)
+      : [];
+
+    const formattedRequirements = Array.isArray(requirements)
+      ? requirements
+      : typeof requirements === "string"
+      ? requirements.split("\n").map((r) => r.trim()).filter(Boolean)
       : [];
 
     const job = await Job.create({
       title: title.trim(),
-      company: companyId,
+      company: targetCompany._id,
       recruiter: req.user._id,
-      description,
-      responsibilities: responsibilities || [],
-      requirements: requirements || [],
+      description: finalDescription,
+      responsibilities: formattedResponsibilities,
+      requirements: formattedRequirements,
       skills: formattedSkills,
-      location,
-      workMode: workMode || "HYBRID",
-      employmentType: employmentType || "FULL_TIME",
-      experience,
-      salary,
-      deadline,
-      status,
+      location: location.trim(),
+      workMode: parsedWorkMode,
+      employmentType: parsedEmploymentType,
+      experience: parsedExperience,
+      salary: parsedSalary,
+      deadline: deadline || undefined,
+      status: status || "PUBLISHED",
     });
 
+    const populatedJob = await Job.findById(job._id).populate("company", "name logo location industry verificationStatus");
 
     return res.status(201).json({
       success: true,
       message: "Job created successfully",
-      job,
+      job: populatedJob,
+      data: populatedJob,
     });
   } catch (err) {
     console.error("Create Job Error:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal server Error !",
+      message: err.message || "Internal server Error !",
     });
   }
 }
