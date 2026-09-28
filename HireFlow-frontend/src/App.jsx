@@ -1,12 +1,13 @@
 import { Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
 
-//main routes
+// main routes
 import Home from './components/ui/Home'
 import Login from './components/ui/Login'
 import Signup from './components/ui/Signup'
 import NotFound from './components/ui/NotFound'
 
-//candidate routes
+// candidate routes
 import CandidadateRoute from './CandidadateRoute'
 import Dashboard from './components/candidate/Dashboard'
 import ApplyJobs from './components/candidate/ApplyJobs'
@@ -27,7 +28,7 @@ import RecProfile from './components/recruiter/Profile'
 
 const App = () => {
   return (
-    <div>
+    <AuthProvider>
       <Routes>
         {/* Main Routes */}
         <Route path='/' element={<Home />} />
@@ -54,9 +55,11 @@ const App = () => {
           <Route path='/recruiter/manage-jobs' element={<ManageJobs />} />
           <Route path='/recruiter/profile' element={<RecProfile />} />
         </Route>
-        <Route path='*' element={<NotFound/>}/>
+
+        {/* 404 Route */}
+        <Route path='*' element={<NotFound />} />
       </Routes>
-    </div>
+    </AuthProvider>
   )
 }
 

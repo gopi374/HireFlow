@@ -1,11 +1,13 @@
-﻿import Interview from "../models/Interview.js";
+import Interview from "../models/Interview.js";
 import Application from "../models/Application.js";
 import { getPagination } from "../utils/response.js";
+import { createNotification } from "../utils/notification.js";
 
 // SCHEDULE New Interview
 export async function scheduleInterview(req, res) {
   const {
-    applicationId,
+    applicationId: rawAppId,
+    application: fallbackAppId,
     scheduledAt,
     durationMinutes,
     type,
@@ -14,6 +16,8 @@ export async function scheduleInterview(req, res) {
     location,
     interviewers,
   } = req.body || {};
+
+  const applicationId = rawAppId || fallbackAppId;
 
   if (!applicationId || !scheduledAt) {
     return res.status(400).json({

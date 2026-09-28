@@ -6,21 +6,57 @@ import { getPagination } from "../utils/response.js";
 export async function getJobs(req, res) {
   try {
     const { page, limit, skip } = getPagination(req.query);
-    const { search, location, workMode, employmentType, skills, minSalary, companyId, status, sort } = req.query;
+    const {
+      search,
+      location,
+      workMode,
+      employmentType,
+      skills,
+      minSalary,
+      companyId,
+      status,
+      sort,
+      mine,
+      public: isPublic,
+    } = req.query;
 
     const filter = {};
 
-    // Candidates and public visitors only see PUBLISHED jobs
-    if (status) {
-      filter.status = status;
-    } else if (!req.user || req.user.role === "CANDIDATE") {
-      filter.status = "PUBLISHED";
+    // Check if request is specifically from a recruiter viewing their own dashboard/jobs
+    const isRecruiterView =
+      mine === "true" ||
+      (req.user && req.user.role === "RECRUITER" && isPublic !== "true" && !companyId);
+
+    if (isRecruiterView && req.user) {
+      // Find companies owned or recruited by this user
+      const userCompanies = await Company.find({
+        $or: [{ owner: req.user._id }, { recruiterIds: req.user._id }],
+      }).select("_id");
+      const companyIds = userCompanies.map((c) => c._id);
+
+      filter.$or = [
+        { recruiter: req.user._id },
+        { company: { $in: companyIds } },
+      ];
+
+      // Recruiters can filter by any status (PUBLISHED, DRAFT, CLOSED, ARCHIVED)
+      if (status && status !== "All") {
+        filter.status = status;
+      }
+    } else {
+      // Public / Candidate view - only published jobs across companies
+      if (status && status !== "All") {
+        filter.status = status;
+      } else {
+        filter.status = "PUBLISHED";
+      }
+
+      if (companyId) filter.company = companyId;
     }
 
-    if (companyId) filter.company = companyId;
     if (location) filter.location = { $regex: location, $options: "i" };
-    if (workMode) filter.workMode = workMode;
-    if (employmentType) filter.employmentType = employmentType;
+    if (workMode && workMode !== "All") filter.workMode = workMode;
+    if (employmentType && employmentType !== "All") filter.employmentType = employmentType;
 
     if (skills) {
       const skillsArray = skills.split(",").map((s) => s.trim().toLowerCase());

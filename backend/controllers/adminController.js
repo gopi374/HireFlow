@@ -3,6 +3,7 @@ import Company from "../models/Company.js";
 import Job from "../models/Job.js";
 import Application from "../models/Application.js";
 import { getPagination } from "../utils/response.js";
+import { createNotification } from "../utils/notification.js";
 
 // GET Platform Statistics
 export async function getPlatformStats(req, res) {

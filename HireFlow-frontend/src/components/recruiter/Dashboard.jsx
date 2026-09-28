@@ -58,19 +58,19 @@ const RecruiterDashboard = () => {
 
       let jobList = []
       if (jobsRes.status === 'fulfilled' && jobsRes.value.ok) {
-        const jobsData = await jobsRes.value.json()
+        const jobsData = await jobsRes.value.json().catch(() => ({}))
         jobList = jobsData.data || jobsData.jobs || (Array.isArray(jobsData) ? jobsData : [])
       }
 
       let appList = []
       if (appsRes.status === 'fulfilled' && appsRes.value.ok) {
-        const appsData = await appsRes.value.json()
+        const appsData = await appsRes.value.json().catch(() => ({}))
         appList = appsData.data || appsData.applications || (Array.isArray(appsData) ? appsData : [])
       }
 
       let intList = []
       if (intsRes.status === 'fulfilled' && intsRes.value.ok) {
-        const intsData = await intsRes.value.json()
+        const intsData = await intsRes.value.json().catch(() => ({}))
         intList = intsData.data || intsData.interviews || (Array.isArray(intsData) ? intsData : [])
       }
 

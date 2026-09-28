@@ -21,16 +21,22 @@ const ManageJobs = () => {
       const token = localStorage.getItem('token') || localStorage.getItem('accessToken')
       const headers = token ? { Authorization: `Bearer ${token}` } : {}
 
-      const [jobsRes, appsRes] = await Promise.all([
-        fetch(`${API_URL}/api/v1/jobs`, { headers }),
+      const [jobsRes, appsRes] = await Promise.allSettled([
+        fetch(`${API_URL}/api/v1/jobs?mine=true`, { headers }),
         fetch(`${API_URL}/api/v1/applications`, { headers })
       ])
 
-      const jobsData = await jobsRes.json()
-      const appsData = await appsRes.json()
+      let fetchedJobs = []
+      if (jobsRes.status === 'fulfilled' && jobsRes.value.ok) {
+        const jobsData = await jobsRes.value.json().catch(() => ({}))
+        fetchedJobs = jobsData.data || jobsData.jobs || (Array.isArray(jobsData) ? jobsData : [])
+      }
 
-      const fetchedJobs = jobsData.success ? (jobsData.data || jobsData.jobs || []) : (Array.isArray(jobsData) ? jobsData : [])
-      const fetchedApps = appsData.success ? (appsData.data || appsData.applications || []) : (Array.isArray(appsData) ? appsData : [])
+      let fetchedApps = []
+      if (appsRes.status === 'fulfilled' && appsRes.value.ok) {
+        const appsData = await appsRes.value.json().catch(() => ({}))
+        fetchedApps = appsData.data || appsData.applications || (Array.isArray(appsData) ? appsData : [])
+      }
 
       setPositions(fetchedJobs)
       setApplications(fetchedApps)
@@ -56,14 +62,22 @@ const ManageJobs = () => {
 
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('accessToken')
-      await fetch(`${API_URL}/api/v1/jobs/${posId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+
+      if (newStatus === 'PUBLISHED') {
+        await fetch(`${API_URL}/api/v1/jobs/${posId}/publish`, { method: 'POST', headers })
+      } else if (newStatus === 'CLOSED') {
+        await fetch(`${API_URL}/api/v1/jobs/${posId}/close`, { method: 'POST', headers })
+      } else {
+        await fetch(`${API_URL}/api/v1/jobs/${posId}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ status: newStatus })
+        })
+      }
     } catch (err) {
       console.error('Failed to update position status:', err)
     }

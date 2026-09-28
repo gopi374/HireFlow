@@ -34,7 +34,7 @@ const ApplicationPipeline = () => {
       // Fetch all applications accessible to recruiter
       const res = await fetch(`${API_URL}/api/v1/applications`, { headers })
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         const appList = data.data || data.applications || (Array.isArray(data) ? data : [])
         setCandidates(appList)
       } else {

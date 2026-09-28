@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, Bell, User, LogOut, Search, Sparkles } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
 const DashNav = () => {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const { user: authUser, logout } = useAuth()
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
-  const username = user.name || user.username || (user.role === 'recruiter' ? 'Tech Corp HR' : 'Alex Morgan')
-  const userEmail = user.email || 'alex.morgan@example.com'
+  const user = authUser || JSON.parse(localStorage.getItem('user') || '{}')
+  const username = user.name || user.username || (String(user.role).toLowerCase() === 'recruiter' ? 'Recruiter' : 'Candidate')
+  const userEmail = user.email || ''
   const initial = username.charAt(0).toUpperCase()
   const role = String(user.role || 'candidate').toLowerCase()
 
@@ -20,11 +22,15 @@ const DashNav = () => {
   ]
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
-    navigate('/login')
+    if (logout) {
+      logout()
+    } else {
+      localStorage.removeItem('token')
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
+      navigate('/login')
+    }
   }
 
   return (

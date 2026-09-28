@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:5000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : "http://localhost:5000/api/v1";
 
 export async function registerUser(userData) {
   const response = await fetch(`${BASE_URL}/auth/register`, {
@@ -9,7 +9,7 @@ export async function registerUser(userData) {
     body: JSON.stringify(userData),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
     throw new Error(data.message || "Registration failed");
   }
@@ -26,7 +26,7 @@ export async function loginUser(credentials) {
     body: JSON.stringify(credentials),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
     throw new Error(data.message || "Login failed");
   }
@@ -34,18 +34,23 @@ export async function loginUser(credentials) {
   return data;
 }
 
-export async function getLoginUser(credentials){
-  const res = await fetch(`${BASE_URL}/auth/me`,{
-    method : "GET",
-    headers : {
-      "Content-Type":"application/json",
+export async function getLoginUser(token) {
+  const authToken = token || localStorage.getItem('token') || localStorage.getItem('accessToken');
+  if (!authToken) {
+    throw new Error("No authentication token found");
+  }
+
+  const res = await fetch(`${BASE_URL}/auth/me`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${authToken}`,
     },
-    body:JSON.stringify(credentials)
   });
 
-  const data = await res.json();
-  if(!res.ok || !data.success){
-    throw new Error(data.message || "Profile Fetch Faild")
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || "Session expired or invalid");
   }
   return data;
 }

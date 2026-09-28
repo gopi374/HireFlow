@@ -49,3 +49,31 @@ export async function protect(req, res, next) {
     });
   }
 }
+
+// Optional Auth Middleware - populates req.user if token is present without blocking if missing
+export async function optionalAuth(req, res, next) {
+  let token;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  } else if (req.cookies?.accessToken) {
+    token = req.cookies.accessToken;
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "default_jwt_secret";
+    const decoded = jwt.verify(token, secret);
+    const user = await User.findById(decoded.id || decoded.userId);
+    if (user && user.status !== "SUSPENDED") {
+      req.user = user;
+    }
+  } catch (err) {
+    // Silently continue for optional auth
+  }
+  next();
+}
+

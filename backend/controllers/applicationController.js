@@ -1,7 +1,8 @@
-﻿import Application from "../models/Application.js";
+import Application from "../models/Application.js";
 import Job from "../models/Job.js";
 import CandidateProfile from "../models/CandidateProfile.js";
 import { getPagination } from "../utils/response.js";
+import { createNotification } from "../utils/notification.js";
 
 const VALID_STATUS_TRANSITIONS = {
   APPLIED: ["SCREENING", "REJECTED", "WITHDRAWN"],
@@ -16,7 +17,7 @@ const VALID_STATUS_TRANSITIONS = {
 // APPLY for a Job
 export async function applyToJob(req, res) {
   const { jobId } = req.params;
-  const { resumeUrl, coverLetter, answers } = req.body || {};
+  const { resumeUrl, resumeId, coverLetter, answers } = req.body || {};
 
   try {
     const job = await Job.findById(jobId).populate("company");
@@ -56,14 +57,20 @@ export async function applyToJob(req, res) {
     let finalResumeUrl = resumeUrl;
     if (!finalResumeUrl) {
       const profile = await CandidateProfile.findOne({ user: req.user._id });
-      const primaryResume = profile?.resumes?.find((r) => r.isPrimary) || profile?.resumes?.[0];
-      if (!primaryResume) {
-        return res.status(400).json({
-          success: false,
-          message: "Please upload or provide a resume link to apply",
-        });
+      if (resumeId && profile?.resumes?.length) {
+        const found = profile.resumes.find((r) => r._id?.toString() === resumeId || r.id === resumeId);
+        if (found) finalResumeUrl = found.fileUrl;
       }
-      finalResumeUrl = primaryResume.fileUrl;
+      if (!finalResumeUrl) {
+        const primaryResume = profile?.resumes?.find((r) => r.isPrimary) || profile?.resumes?.[0];
+        if (!primaryResume) {
+          return res.status(400).json({
+            success: false,
+            message: "Please upload or select a resume to apply",
+          });
+        }
+        finalResumeUrl = primaryResume.fileUrl;
+      }
     }
 
     const application = await Application.create({
@@ -103,6 +110,75 @@ export async function applyToJob(req, res) {
     });
   } catch (err) {
     console.error("Apply Job Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server Error !",
+    });
+  }
+}
+
+// GET All Applications (Role-based access: Recruiter sees applications for their jobs, Candidate sees own, Admin sees all)
+export async function getApplications(req, res) {
+  try {
+    const { page, limit, skip } = getPagination(req.query);
+    const { status, jobId, candidateId } = req.query;
+
+    const filter = {};
+
+    if (req.user.role === "RECRUITER") {
+      const recruiterJobs = await Job.find({ recruiter: req.user._id }).select("_id");
+      const jobIds = recruiterJobs.map((j) => j._id);
+      if (jobId) {
+        if (jobIds.some((id) => id.toString() === jobId.toString())) {
+          filter.job = jobId;
+        } else {
+          filter.job = { $in: [] };
+        }
+      } else {
+        filter.job = { $in: jobIds };
+      }
+    } else if (req.user.role === "CANDIDATE") {
+      filter.candidate = req.user._id;
+      if (jobId) filter.job = jobId;
+    } else if (req.user.role === "ADMIN") {
+      if (jobId) filter.job = jobId;
+      if (candidateId) filter.candidate = candidateId;
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    const [applications, total] = await Promise.all([
+      Application.find(filter)
+        .populate("candidate", "name email phone")
+        .populate({
+          path: "job",
+          select: "title company location employmentType workMode status",
+          populate: { path: "company", select: "name logo location" },
+        })
+        .populate("statusHistory.changedBy", "name email")
+        .populate("recruiterNotes.author", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Application.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Applications fetched successfully",
+      data: applications,
+      applications,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Get Applications Error:", err);
     return res.status(500).json({
       success: false,
       message: "Internal server Error !",
@@ -233,11 +309,11 @@ export async function updateApplicationStatus(req, res) {
       });
     }
 
-    const allowed = VALID_STATUS_TRANSITIONS[application.status];
-    if (!allowed || !allowed.includes(status)) {
+    const ALL_STATUSES = ["APPLIED", "SCREENING", "SHORTLISTED", "INTERVIEW", "SELECTED", "REJECTED", "WITHDRAWN"];
+    if (!ALL_STATUSES.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: `Invalid status transition from ${application.status} to ${status}. Allowed: ${allowed?.join(", ") || "none"}`,
+        message: `Invalid status "${status}". Allowed values: ${ALL_STATUSES.join(", ")}`,
       });
     }
 

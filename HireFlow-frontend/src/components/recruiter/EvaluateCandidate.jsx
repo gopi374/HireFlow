@@ -52,12 +52,15 @@ const EvaluateCandidate = () => {
 
       const res = await fetch(`${API_URL}/api/v1/applications`, { headers })
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         const appList = data.data || data.applications || (Array.isArray(data) ? data : [])
         setApplications(appList)
         if (appList.length > 0) {
           setSelectedAppId(appList[0]._id || appList[0].id)
         }
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setErrorMessage(data.message || 'Could not load candidate applications.')
       }
     } catch (err) {
       console.error('Error fetching applications for evaluation:', err)
@@ -130,10 +133,11 @@ const EvaluateCandidate = () => {
 
       const scheduledAt = new Date(`${interviewDate}T${interviewTime}:00`).toISOString()
 
-      await fetch(`${API_URL}/api/v1/interviews`, {
+      const res = await fetch(`${API_URL}/api/v1/interviews`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
+          applicationId: appId,
           application: appId,
           job: jobId,
           candidate: candidateId,
@@ -144,11 +148,16 @@ const EvaluateCandidate = () => {
         })
       })
 
-      setScheduleSuccess(true)
-      setTimeout(() => {
-        setScheduleSuccess(false)
-        setShowScheduleModal(false)
-      }, 1800)
+      if (res.ok) {
+        setScheduleSuccess(true)
+        setTimeout(() => {
+          setScheduleSuccess(false)
+          setShowScheduleModal(false)
+        }, 1800)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setErrorMessage(data.message || 'Failed to schedule interview.')
+      }
     } catch (err) {
       console.error('Failed to schedule interview:', err)
       setErrorMessage('Failed to schedule interview.')

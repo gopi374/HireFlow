@@ -9,7 +9,8 @@ import {
   PlusCircle,
   Edit,
   Power,
-  Loader2
+  Loader2,
+  Building2
 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -29,15 +30,20 @@ const RecruiterJobs = () => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('accessToken')
       const headers = token ? { Authorization: `Bearer ${token}` } : {}
-      const res = await fetch(`${API_URL}/api/v1/jobs`, { headers })
-      const data = await res.json()
+      
+      // Request jobs created by this recruiter / company
+      const res = await fetch(`${API_URL}/api/v1/jobs?mine=true`, { headers })
+      const data = await res.json().catch(() => ({}))
       if (res.ok && data.success) {
         setJobsList(data.data || data.jobs || [])
       } else if (Array.isArray(data)) {
         setJobsList(data)
+      } else {
+        setJobsList([])
       }
     } catch (err) {
       console.error('Failed to fetch jobs:', err)
+      setJobsList([])
     } finally {
       setLoading(false)
     }
@@ -46,27 +52,33 @@ const RecruiterJobs = () => {
   const toggleJobStatus = async (id, currentStatus) => {
     const nextStatus = currentStatus === 'ACTIVE' || currentStatus === 'PUBLISHED' ? 'CLOSED' : 'PUBLISHED'
     setJobsList(prev =>
-      prev.map(j => (j._id === id || j.id === id ? { ...j, status: nextStatus } : j))
+      prev.map(j => ((j._id || j.id) === id ? { ...j, status: nextStatus } : j))
     )
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('accessToken')
-      await fetch(`${API_URL}/api/v1/jobs/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: nextStatus })
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+      const endpoint = nextStatus === 'PUBLISHED'
+        ? `${API_URL}/api/v1/jobs/${id}/publish`
+        : `${API_URL}/api/v1/jobs/${id}/close`
+
+      await fetch(endpoint, {
+        method: 'POST',
+        headers
       })
     } catch (err) {
       console.error('Failed to update job status:', err)
+      fetchJobs()
     }
   }
 
   const filteredJobs = jobsList.filter(job => {
     const titleMatch = (job.title || '').toLowerCase().includes(searchTerm.toLowerCase())
     const deptMatch = (job.department || job.category || '').toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesSearch = titleMatch || deptMatch
+    const companyMatch = (job.company?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = !searchTerm || titleMatch || deptMatch || companyMatch
     const matchesStatus = selectedStatus === 'All' || job.status === selectedStatus
     return matchesSearch && matchesStatus
   })
@@ -90,16 +102,16 @@ const RecruiterJobs = () => {
                     <span>Company Postings</span>
                   </div>
                   <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    All Job Postings
+                    Company Job Postings
                   </h1>
                   <p className="text-xs text-slate-500 mt-1">
-                    Manage published listings, applicant counts, and hiring status lifecycle.
+                    Manage your company's active openings, review applicant pipeline, and control lifecycle status.
                   </p>
                 </div>
 
                 <Link
                   to="/recruiter/create-jobs"
-                  className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm self-start sm:self-auto flex items-center gap-2"
+                  className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm self-start sm:self-auto flex items-center gap-2 transition-all active:scale-95"
                 >
                   <PlusCircle className="w-4 h-4" /> Post New Job
                 </Link>
@@ -107,14 +119,15 @@ const RecruiterJobs = () => {
 
               {/* Status Filters */}
               <div className="flex flex-wrap items-center gap-2 mt-6 pt-6 border-t border-slate-100">
-                {['All', 'ACTIVE', 'PUBLISHED', 'DRAFT', 'CLOSED'].map(status => (
+                {['All', 'PUBLISHED', 'DRAFT', 'CLOSED'].map(status => (
                   <button
                     key={status}
                     onClick={() => setSelectedStatus(status)}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${selectedStatus === status
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                      selectedStatus === status
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
-                      }`}
+                    }`}
                   >
                     {status} ({status === 'All' ? jobsList.length : jobsList.filter(j => j.status === status).length})
                   </button>
@@ -129,7 +142,7 @@ const RecruiterJobs = () => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search job listings by title or department..."
+                placeholder="Search company job listings by title or department..."
                 className="w-full bg-white border border-slate-200 rounded-2xl text-xs text-slate-800 pl-11 pr-4 py-3.5 focus:outline-none focus:border-blue-500 shadow-sm"
               />
             </div>
@@ -139,24 +152,39 @@ const RecruiterJobs = () => {
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-16 bg-white border border-slate-200 rounded-3xl">
                   <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-3" />
-                  <p className="text-xs font-semibold text-slate-500">Loading job postings...</p>
+                  <p className="text-xs font-semibold text-slate-500">Loading your company's postings...</p>
                 </div>
               ) : filteredJobs.length === 0 ? (
-                <div className="text-center py-16 bg-white border border-slate-200 rounded-3xl p-6">
-                  <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <div className="text-center py-16 bg-white border border-slate-200 rounded-3xl p-8 space-y-3">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-200">
+                    <Briefcase className="w-7 h-7" />
+                  </div>
                   <h3 className="text-base font-bold text-slate-800">No Job Postings Found</h3>
-                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                    No active job listings match your current filters. Post a new job or clear your search term.
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    {jobsList.length === 0
+                      ? "Your company hasn't posted any jobs yet. Create your first opening to begin receiving candidate applications."
+                      : "No postings match your active search filter."}
                   </p>
+                  {jobsList.length === 0 && (
+                    <Link
+                      to="/recruiter/create-jobs"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm"
+                    >
+                      <PlusCircle className="w-4 h-4" /> Post Your First Job
+                    </Link>
+                  )}
                 </div>
               ) : (
                 filteredJobs.map(job => {
                   const jobId = job._id || job.id
                   const dept = job.department || job.category || 'Engineering'
+                  const compName = job.company?.name || 'My Company'
                   const salaryText = typeof job.salary === 'object' && job.salary
-                    ? `₹${job.salary.min ? job.salary.min.toLocaleString() : '0'} - ₹${job.salary.max ? job.salary.max.toLocaleString() : '0'}`
-                    : (job.salary || 'Salary Disclosed on Interview')
-                  const count = job.applicantCount ?? (job.applications ? job.applications.length : 0)
+                    ? (job.salary.min || job.salary.max
+                        ? `₹${job.salary.min ? job.salary.min.toLocaleString() : '0'} - ₹${job.salary.max ? job.salary.max.toLocaleString() : '0'}`
+                        : 'Competitive')
+                    : (job.salary || 'Competitive')
+                  const count = job.applicationsCount ?? (job.applications ? job.applications.length : 0)
 
                   return (
                     <div
@@ -166,17 +194,23 @@ const RecruiterJobs = () => {
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-bold text-slate-900">{job.title}</h3>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${job.status === 'ACTIVE' || job.status === 'PUBLISHED'
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            job.status === 'ACTIVE' || job.status === 'PUBLISHED'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                               : job.status === 'DRAFT'
                                 ? 'bg-amber-50 text-amber-800 border-amber-200'
                                 : 'bg-rose-50 text-rose-800 border-rose-200'
-                            }`}>
+                          }`}>
                             {job.status || 'PUBLISHED'}
                           </span>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                          <span className="flex items-center gap-1 font-semibold text-slate-700">
+                            <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                            {compName}
+                          </span>
+                          <span>•</span>
                           <span>Dept: {dept}</span>
                           <span>•</span>
                           <span>{job.location || 'Remote'}</span>
@@ -186,8 +220,8 @@ const RecruiterJobs = () => {
                       </div>
 
                       {/* Applicants & Actions */}
-                      <div className="flex items-center gap-4">
-                        <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200 text-center">
+                      <div className="flex items-center gap-4 self-end lg:self-center">
+                        <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-200 text-center min-w-[90px]">
                           <p className="text-[10px] text-slate-500 font-bold uppercase">Applicants</p>
                           <p className="text-base font-extrabold text-blue-700">{count}</p>
                         </div>
@@ -210,10 +244,11 @@ const RecruiterJobs = () => {
 
                           <button
                             onClick={() => toggleJobStatus(jobId, job.status)}
-                            className={`p-2.5 rounded-xl border transition-colors ${job.status === 'CLOSED'
+                            className={`p-2.5 rounded-xl border transition-colors ${
+                              job.status === 'CLOSED'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : 'bg-rose-50 text-rose-700 border-rose-200'
-                              }`}
+                            }`}
                             title={job.status === 'CLOSED' ? 'Re-open Job' : 'Close Job'}
                           >
                             <Power className="w-4 h-4" />

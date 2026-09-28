@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  getApplications,
   getApplicationById,
   updateApplicationStatus,
   addRecruiterNote,
@@ -12,6 +13,9 @@ const router = express.Router();
 
 // Require login for application operations
 router.use(protect);
+
+// View applications list
+router.get("/", getApplications);
 
 // View application details
 router.get("/:applicationId", getApplicationById);
