@@ -14,7 +14,7 @@ import {
   Info
 } from 'lucide-react'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API_URL = "https://hireflow-p9ty.onrender.com"
 
 const ApplyJobs = () => {
   const [applications, setApplications] = useState([])
